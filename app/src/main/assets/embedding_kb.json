@@ -1,0 +1,28 @@
+{
+  "version": "demo-v0.1",
+  "model": "gemma-local-embedding-demo",
+  "note": "Tiny deterministic embedding demo asset for offline hackathon recording.",
+  "items": [
+    {
+      "id": "digestive_stomach",
+      "keywords": ["胃", "胃痛", "胃不舒服", "肚子", "腹胀", "恶心", "吐"],
+      "department": "消化内科",
+      "hospital": "北京协和医院",
+      "reason": "胃部不适、腹胀或恶心优先建议消化内科。"
+    },
+    {
+      "id": "respiratory_fever",
+      "keywords": ["发烧", "咳嗽", "嗓子", "胸闷", "呼吸"],
+      "department": "呼吸内科",
+      "hospital": "北京朝阳医院",
+      "reason": "发热、咳嗽或胸闷优先建议呼吸内科。"
+    },
+    {
+      "id": "neurology_headache",
+      "keywords": ["头痛", "头晕", "眩晕", "麻木"],
+      "department": "神经内科",
+      "hospital": "北京大学人民医院",
+      "reason": "头痛、头晕或麻木优先建议神经内科。"
+    }
+  ]
+}

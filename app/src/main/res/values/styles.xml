@@ -1,0 +1,7 @@
+<resources>
+    <style name="Theme.LaoBaiGemmaDemo" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:statusBarColor">#F4F7F2</item>
+        <item name="android:navigationBarColor">#F4F7F2</item>
+    </style>
+</resources>

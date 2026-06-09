@@ -2,7 +2,7 @@
 
 ## 准备
 
-1. 配置 `config.local.json`，填入 planner endpoint、model 和 key。
+1. 配置 `config.local.json`，填入私有 planner endpoint、model 和 key。
 2. 运行：
 
 ```powershell
@@ -11,6 +11,8 @@
 
 3. 浏览器打开首页后开始录屏。
 
+如果现场网络或本地模型服务不可用，可以直接打开 `web/always-on-form.html` 和 `web/trigger-health.html`，页面会使用内置安全 action 序列保证演示连续。
+
 ## Demo 1：Always-on 自动填表
 
 1. 点击 `Always-on 自动填表`。
@@ -18,7 +20,7 @@
 3. 点击 `启动 Agent`。
 4. 右侧展示：
    - Gemma 4B Computer-Use
-   - Gemini 4 30B Cloud Planner
+   - Cloud Planner Adapter
 5. Agent 自动填写：
    - 李桂兰
    - 70s
@@ -44,7 +46,7 @@
 7. Agent 填写准备材料。
 8. Agent 停在 `确认挂号 / 支付 / 验证码` 前。
 
-讲解重点：Trigger 模式由用户主动触发；云侧只拿脱敏摘要做规划，端侧负责执行和安全守卫。
+讲解重点：Trigger 模式由用户主动触发；planner 只拿脱敏摘要做规划，端侧负责执行和安全守卫。
 
 ## 话术
 
@@ -54,5 +56,5 @@
 ```
 
 ```text
-界面上看不到 Key，也看不到底层转发服务。演示中只展示 Gemma 4B Computer-Use 和 Gemini 4 30B Cloud Planner 的协作。
+界面上看不到 Key、真实 endpoint、真实 model 或底层服务。演示中只展示 Gemma 4B Computer-Use 和 Cloud Planner Adapter 的协作。
 ```

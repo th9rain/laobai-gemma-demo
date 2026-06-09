@@ -67,12 +67,14 @@ server.listen(port, () => {
 async function loadConfig() {
   const defaults = {
     plannerEndpoint: process.env.LAOBAI_PLANNER_ENDPOINT || "",
-    plannerModel: process.env.LAOBAI_PLANNER_MODEL || "gemini-4-30b-cloud-planner",
+    plannerModel: process.env.LAOBAI_PLANNER_MODEL || "cloud-planner-model",
     plannerApiKey: process.env.LAOBAI_PLANNER_API_KEY || "",
     edgeEndpoint: process.env.LAOBAI_EDGE_ENDPOINT || "",
     edgeModel: process.env.LAOBAI_EDGE_MODEL || "gemma-4b-computer-use",
     edgeApiKey: process.env.LAOBAI_EDGE_API_KEY || "",
-    publicPlannerLabel: process.env.LAOBAI_PUBLIC_PLANNER_LABEL || "Gemini 4 30B Cloud Planner",
+  };
+  const publicLabels = {
+    publicPlannerLabel: process.env.LAOBAI_PUBLIC_PLANNER_LABEL || "Cloud Planner Adapter",
     publicEdgeLabel: process.env.LAOBAI_PUBLIC_EDGE_LABEL || "Gemma 4B Computer-Use",
   };
   const localPath = path.join(rootDir, "config.local.json");
@@ -86,6 +88,7 @@ async function loadConfig() {
   }
   return {
     ...merged,
+    ...publicLabels,
     edgeEndpoint: merged.edgeEndpoint || merged.plannerEndpoint,
     edgeApiKey: merged.edgeApiKey || merged.plannerApiKey,
   };

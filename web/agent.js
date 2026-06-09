@@ -1,10 +1,10 @@
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-export async function bootAgent(options) {
+window.bootAgent = async function bootAgent(options) {
   const state = {
     running: false,
     step: 0,
-    config: { plannerLabel: "Gemini 4 30B Cloud Planner", edgeLabel: "Gemma 4B Computer-Use", plannerOnline: false },
+    config: { plannerLabel: "Cloud Planner Adapter", edgeLabel: "Gemma 4B Computer-Use", plannerOnline: false },
   };
 
   const trace = document.querySelector("[data-trace]");
@@ -92,21 +92,35 @@ export async function bootAgent(options) {
     trace?.appendChild(item);
     trace?.scrollTo({ top: trace.scrollHeight, behavior: "smooth" });
   }
-}
+};
 
 async function requestPlan(scenario, observation) {
-  const response = await fetch("/api/plan", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ scenario, observation }),
-  });
-  if (!response.ok) {
-    throw new Error(`Planner request failed: ${response.status}`);
+  if (window.location.protocol === "file:") {
+    return fallbackPlan(scenario);
   }
-  return response.json();
+  try {
+    const response = await fetch("/api/plan", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ scenario, observation }),
+    });
+    if (!response.ok) {
+      return fallbackPlan(scenario);
+    }
+    return response.json();
+  } catch {
+    return fallbackPlan(scenario);
+  }
 }
 
 async function loadPublicConfig() {
+  if (window.location.protocol === "file:") {
+    return {
+      plannerLabel: "Cloud Planner Adapter",
+      edgeLabel: "Gemma 4B Computer-Use",
+      plannerOnline: false,
+    };
+  }
   try {
     const response = await fetch("/api/public-config");
     if (!response.ok) return {};
@@ -114,6 +128,39 @@ async function loadPublicConfig() {
   } catch {
     return {};
   }
+}
+
+function fallbackPlan(scenario) {
+  if (scenario === "trigger-health") {
+    return {
+      ok: true,
+      source: "static-html-policy",
+      summary: "静态 HTML 模式：使用内置安全动作序列演示挂号流程。",
+      actions: [
+        { type: "click", target: "ask-button", reason: "用户触发后先做端侧问询" },
+        { type: "click", target: "answer-button", reason: "演示回答：两天，轻微恶心，无胸痛" },
+        { type: "select", target: "hospital", value: "北京协和医院", reason: "北京固定候选医院中优先选择协和" },
+        { type: "select", target: "department", value: "消化内科", reason: "胃部不适匹配消化内科" },
+        { type: "select", target: "date", value: "明天上午", reason: "选择较近的可用时段" },
+        { type: "type", target: "materials", value: "身份证、医保卡、既往病历", reason: "提醒准备材料" },
+        { type: "guard", target: "confirm-button", reason: "确认挂号、支付、验证码必须由用户确认" },
+      ],
+    };
+  }
+  return {
+    ok: true,
+    source: "static-html-policy",
+    summary: "静态 HTML 模式：使用内置安全动作序列演示自动填表。",
+    actions: [
+      { type: "type", target: "name", value: "李桂兰", reason: "填写本地记忆中的姓名" },
+      { type: "type", target: "age", value: "70s", reason: "填写年龄段" },
+      { type: "type", target: "phone", value: "138****2675", reason: "只填写脱敏手机号" },
+      { type: "type", target: "area", value: "北京市朝阳区望京街道", reason: "填写居住区域" },
+      { type: "type", target: "contact", value: "女儿 王敏", reason: "填写紧急联系人" },
+      { type: "select", target: "course", value: "智能手机基础课", reason: "选择偏好课程" },
+      { type: "guard", target: "submit-button", reason: "提交报名属于高风险动作，必须停住" },
+    ],
+  };
 }
 
 async function typeInto(element, value) {

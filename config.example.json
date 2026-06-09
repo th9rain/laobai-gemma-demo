@@ -1,10 +1,10 @@
 {
-  "plannerEndpoint": "https://your-cloud-planner.example.com/api/v3/responses",
-  "plannerModel": "gemini-4-30b-cloud-planner",
+  "plannerEndpoint": "https://your-private-planner.example.com/api/v3/responses",
+  "plannerModel": "cloud-planner-model",
   "plannerApiKey": "put-your-key-here",
   "edgeEndpoint": "https://your-edge-computer-use.example.com/api/v3/responses",
   "edgeModel": "gemma-4b-computer-use",
   "edgeApiKey": "put-your-edge-key-here",
-  "publicPlannerLabel": "Gemini 4 30B Cloud Planner",
+  "publicPlannerLabel": "Cloud Planner Adapter",
   "publicEdgeLabel": "Gemma 4B Computer-Use"
 }

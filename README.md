@@ -24,6 +24,8 @@
 .\run-trigger-demo.ps1
 ```
 
+两个 HTML 也可以直接双击打开做离线演示；这时会使用页面内置的安全 action 序列。需要隐藏 Key 的模型调用时，使用上面的本地 server 启动方式。
+
 ## 模型调用与 Key
 
 页面上不会展示 API Key，也不会展示具体底层供应商或转发服务。
@@ -34,15 +36,15 @@
 Copy-Item config.example.json config.local.json
 ```
 
-然后在 `config.local.json` 中填写本地 planner endpoint、model 和 key。这个文件被 `.gitignore` 忽略，不会提交到 GitHub。
-如果端侧 Computer-Use 和云侧 Planner 暂时共用一个代理服务，可以让 `edgeEndpoint/edgeApiKey` 留空；server 会默认复用 planner 配置。
+然后在 `config.local.json` 中填写私有 planner endpoint、model 和 key。这个文件被 `.gitignore` 忽略，不会提交到 GitHub。
+如果端侧 Computer-Use 和云侧 planner 暂时共用一个私有代理服务，可以让 `edgeEndpoint/edgeApiKey` 留空；server 会默认复用 planner 配置。
 
 页面只显示：
 
 - `Gemma 4B Computer-Use`
-- `Gemini 4 30B Cloud Planner`
+- `Cloud Planner Adapter`
 
-实际请求由 `tools/demo-server.mjs` 的 `/api/plan` 代理完成。浏览器前端只能看到 `/api/plan`，看不到真实 Key、真实 endpoint 或底层转发服务。server 会先请求云侧 planner，再把规划交给端侧 Computer-Use adapter 生成最终 GUI action。
+实际请求由 `tools/demo-server.mjs` 的 `/api/plan` 代理完成。浏览器前端只能看到 `/api/plan`，看不到真实 Key、真实 endpoint、真实 model 或底层服务。server 会先请求私有 planner adapter，再把规划交给端侧 Computer-Use adapter 生成最终 GUI action。
 
 如果没有配置 Key，demo 会自动使用本地安全 fallback action，保证演示可运行。
 
@@ -54,7 +56,7 @@ Copy-Item config.example.json config.local.json
 
 1. 点击 `启动 Agent` 或用 `?autostart=1` 自动启动。
 2. 页面生成脱敏观察摘要。
-3. 本地 server 调用云侧 planner 或使用 fallback。
+3. 本地 server 调用私有 planner adapter 或使用 fallback。
 4. 执行器逐步操作模拟手机页面：
    - 输入姓名、年龄段、手机号、居住区域、紧急联系人
    - 选择报名课程
@@ -76,7 +78,7 @@ Copy-Item config.example.json config.local.json
 
 - 原始屏幕不上传。
 - 身份证、完整手机号、验证码、病历原文不上云。
-- 云端 planner 只接收结构化脱敏摘要。
+- planner adapter 只接收结构化脱敏摘要。
 - 高风险动作必须 `guard`，不能自动执行。
 
 ## 文件结构
@@ -90,8 +92,15 @@ web/
   agent.js
 tools/
   demo-server.mjs
+  verify-demo.mjs
 config.example.json
 run-demo-server.ps1
 run-always-on-demo.ps1
 run-trigger-demo.ps1
+```
+
+## 验证
+
+```powershell
+node .\tools\verify-demo.mjs
 ```

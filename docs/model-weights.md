@@ -5,7 +5,7 @@
 原因：
 
 - 端侧模型权重体积大，不适合直接提交 Git。
-- 云侧 planner Key 不能提交到公开仓库。
+- planner Key 不能提交到公开仓库。
 - 路演演示更需要稳定的 GUI action 链路。
 
 ## 本地配置
@@ -21,12 +21,12 @@ Copy-Item config.example.json config.local.json
 ```json
 {
   "plannerEndpoint": "https://example.com/api/v3/responses",
-  "plannerModel": "gemini-4-30b-cloud-planner",
+  "plannerModel": "cloud-planner-model",
   "plannerApiKey": "your-local-key",
   "edgeEndpoint": "https://example.com/api/v3/responses",
   "edgeModel": "gemma-4b-computer-use",
   "edgeApiKey": "your-local-key",
-  "publicPlannerLabel": "Gemini 4 30B Cloud Planner",
+  "publicPlannerLabel": "Cloud Planner Adapter",
   "publicEdgeLabel": "Gemma 4B Computer-Use"
 }
 ```
@@ -35,9 +35,9 @@ Copy-Item config.example.json config.local.json
 
 ## 替换真实模型
 
-后续如果接入真实 Gemma/Gemini 端侧能力：
+后续如果接入真实端侧模型和云侧 planner 能力：
 
 1. 保持前端 action schema 不变。
-2. 在 `tools/demo-server.mjs` 替换 planner endpoint。
+2. 在 `config.local.json` 或环境变量中替换 planner endpoint。
 3. 将 fallback action 替换为模型输出校验后的 action。
 4. 保留高风险 action guard。

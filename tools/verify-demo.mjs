@@ -28,6 +28,9 @@ async function main() {
         visibleFields: ["姓名", "年龄段", "手机号", "居住区域", "紧急联系人", "报名课程"],
       },
     });
+    assert(form.runtime?.keyVisibleToBrowser === false, "form runtime exposes key state incorrectly");
+    assert(form.runtime?.providerVisibleToBrowser === false, "form runtime exposes provider state incorrectly");
+    assert(form.runtime?.modelNameVisibleToBrowser === false, "form runtime exposes model state incorrectly");
     assertAction(form, "type", "name");
     assertAction(form, "select", "course");
     assertAction(form, "guard", "submit-button");
@@ -39,6 +42,8 @@ async function main() {
         symptomSummary: "胃不舒服，持续两天，轻微恶心，无胸痛",
       },
     });
+    assert(health.runtime?.keyVisibleToBrowser === false, "health runtime exposes key state incorrectly");
+    assert(health.runtime?.privacyScope, "health runtime missing privacy scope");
     assertAction(health, "click", "ask-button");
     assertAction(health, "select", "department");
     assertAction(health, "guard", "confirm-button");

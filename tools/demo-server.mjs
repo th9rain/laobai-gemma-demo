@@ -70,7 +70,7 @@ async function loadConfig() {
     plannerModel: process.env.LAOBAI_PLANNER_MODEL || "cloud-planner-model",
     plannerApiKey: process.env.LAOBAI_PLANNER_API_KEY || "",
     edgeEndpoint: process.env.LAOBAI_EDGE_ENDPOINT || "",
-    edgeModel: process.env.LAOBAI_EDGE_MODEL || "gemma-4b-computer-use",
+    edgeModel: process.env.LAOBAI_EDGE_MODEL || "",
     edgeApiKey: process.env.LAOBAI_EDGE_API_KEY || "",
   };
   const publicLabels = {
@@ -90,8 +90,14 @@ async function loadConfig() {
     ...merged,
     ...publicLabels,
     edgeEndpoint: merged.edgeEndpoint || merged.plannerEndpoint,
+    edgeModel: explicitEdgeModel(merged) ? merged.edgeModel : "",
     edgeApiKey: merged.edgeApiKey || merged.plannerApiKey,
   };
+}
+
+function explicitEdgeModel(configData) {
+  const value = String(configData.edgeModel || "").trim();
+  return Boolean(value && value !== "gemma-4b-computer-use" && value !== "your-edge-model");
 }
 
 async function plannerRequest(payload) {
@@ -102,47 +108,70 @@ async function plannerRequest(payload) {
 
 async function cloudPlannerRequest(payload, fallback) {
   if (!config.plannerApiKey || !config.plannerEndpoint) {
-    return {
+    return withRuntime({
       ...fallback,
       source: "edge-policy",
       note: "Local policy fallback. Configure config.local.json to enable cloud planner.",
-    };
+    }, {
+      plannerConfigured: false,
+      plannerHandoff: false,
+      plannerStatus: "local-policy",
+    });
   }
 
   const prompt = buildPlannerPrompt(payload, fallback);
-  return invokePlanningModel({
+  const plan = await invokePlanningModel({
     endpoint: config.plannerEndpoint,
     model: config.plannerModel,
     apiKey: config.plannerApiKey,
     prompt,
     fallback,
-    timeoutMs: Number(process.env.LAOBAI_PLANNER_TIMEOUT_MS || 4500),
+    timeoutMs: Number(process.env.LAOBAI_PLANNER_TIMEOUT_MS || 20000),
+    successSource: "cloud-planner",
+    fallbackSource: "edge-policy",
     unavailableNote: "Planner handoff unavailable; safe edge policy used.",
+  });
+  return withRuntime(plan, {
+    plannerConfigured: true,
+    plannerHandoff: plan.source === "cloud-planner",
+    plannerStatus: plan.source === "cloud-planner" ? "handoff-ok" : "safe-fallback",
   });
 }
 
 async function edgeComputerUseRequest(payload, cloudPlan) {
-  if (!config.edgeApiKey || !config.edgeEndpoint) {
-    return {
+  if (!config.edgeApiKey || !config.edgeEndpoint || !config.edgeModel) {
+    return withRuntime({
       ...cloudPlan,
-      source: "edge-policy",
-      note: "Edge computer-use adapter not configured; safe action policy used.",
-    };
+      note: config.edgeModel
+        ? "Edge computer-use adapter not configured; safe action policy used."
+        : "Browser executor used for GUI actions after planner validation.",
+    }, {
+      edgeConfigured: false,
+      edgeHandoff: false,
+      edgeStatus: "browser-executor",
+    });
   }
 
   const prompt = buildEdgePrompt(payload, cloudPlan);
-  return invokePlanningModel({
+  const plan = await invokePlanningModel({
     endpoint: config.edgeEndpoint,
     model: config.edgeModel,
     apiKey: config.edgeApiKey,
     prompt,
     fallback: cloudPlan,
-    timeoutMs: Number(process.env.LAOBAI_EDGE_TIMEOUT_MS || 3500),
+    timeoutMs: Number(process.env.LAOBAI_EDGE_TIMEOUT_MS || 12000),
+    successSource: "edge-computer-use",
+    fallbackSource: cloudPlan.source || "edge-policy",
     unavailableNote: "Edge computer-use handoff unavailable; safe action policy used.",
+  });
+  return withRuntime(plan, {
+    edgeConfigured: true,
+    edgeHandoff: plan.source === "edge-computer-use",
+    edgeStatus: plan.source === "edge-computer-use" ? "handoff-ok" : "safe-fallback",
   });
 }
 
-async function invokePlanningModel({ endpoint, model, apiKey, prompt, fallback, timeoutMs, unavailableNote }) {
+async function invokePlanningModel({ endpoint, model, apiKey, prompt, fallback, timeoutMs, successSource, fallbackSource, unavailableNote }) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -165,23 +194,51 @@ async function invokePlanningModel({ endpoint, model, apiKey, prompt, fallback, 
     });
     clearTimeout(timer);
     const raw = await response.text();
+    debugModelCall(successSource, {
+      httpStatus: response.status,
+      ok: response.ok,
+      responseBytes: Buffer.byteLength(raw, "utf8"),
+    });
     if (!response.ok) {
       return {
         ...fallback,
-        source: "edge-policy",
+        source: fallbackSource,
         note: unavailableNote,
       };
     }
     const text = extractPlannerText(raw);
-    return normalizePlan(text, fallback);
+    debugModelCall(successSource, {
+      extractedTextBytes: Buffer.byteLength(text, "utf8"),
+      hasJsonObject: Boolean(parseJsonObject(text)),
+    });
+    return normalizePlan(text, fallback, successSource);
   } catch (error) {
     clearTimeout(timer);
+    debugModelCall(successSource, {
+      errorName: String(error?.name || "Error"),
+      errorMessage: sanitizeDebugMessage(error?.message || error),
+    });
     return {
       ...fallback,
-      source: "edge-policy",
+      source: fallbackSource,
       note: unavailableNote,
     };
   }
+}
+
+function debugModelCall(stage, detail) {
+  if (process.env.LAOBAI_DEBUG_MODEL !== "1") return;
+  console.error(JSON.stringify({
+    stage,
+    ...detail,
+  }));
+}
+
+function sanitizeDebugMessage(message) {
+  return String(message || "")
+    .replace(/Bearer\s+[A-Za-z0-9._-]+/g, "Bearer [hidden]")
+    .replace(/https?:\/\/\S+/g, "[url-hidden]")
+    .slice(0, 180);
 }
 
 function buildPlannerPrompt(payload, fallback) {
@@ -228,12 +285,12 @@ function extractPlannerText(raw) {
   return raw;
 }
 
-function normalizePlan(text, fallback) {
+function normalizePlan(text, fallback, source) {
   const parsed = parseJsonObject(text);
   if (!parsed || !Array.isArray(parsed.actions)) {
     return {
       ...fallback,
-      source: "cloud-planner",
+      source: fallback.source || "edge-policy",
       note: "Planner returned narrative text; safe action policy used.",
       cloudSummary: text.slice(0, 220),
     };
@@ -246,12 +303,56 @@ function normalizePlan(text, fallback) {
       reason: String(action.reason || "planner action"),
     }))
     .filter((action) => isSafeAction(action));
+  const completedActions = completeDemoActions(safeActions, fallback.actions);
   return {
     ok: true,
-    source: "cloud-planner",
+    source,
     summary: String(parsed.summary || fallback.summary),
-    actions: safeActions.length > 0 ? safeActions : fallback.actions,
-    note: "Cloud planner produced safe GUI actions.",
+    actions: completedActions,
+    note: "Model adapter produced safe GUI actions.",
+    runtime: fallback.runtime || {},
+  };
+}
+
+function completeDemoActions(modelActions, fallbackActions) {
+  if (!Array.isArray(modelActions) || modelActions.length === 0) return fallbackActions;
+  const extras = [];
+  const completed = fallbackActions.map((fallbackAction) => {
+    const modelAction = modelActions.find((action) => sameActionSlot(action, fallbackAction));
+    if (!modelAction || actionNeedsFallback(modelAction)) return fallbackAction;
+    return {
+      ...fallbackAction,
+      ...modelAction,
+      reason: modelAction.reason || fallbackAction.reason,
+    };
+  });
+  for (const action of modelActions) {
+    if (!fallbackActions.some((fallbackAction) => sameActionSlot(action, fallbackAction))) {
+      extras.push(action);
+    }
+  }
+  return [...completed.slice(0, -1), ...extras, completed[completed.length - 1]].filter(Boolean);
+}
+
+function sameActionSlot(action, fallbackAction) {
+  return action.type === fallbackAction.type && action.target === fallbackAction.target;
+}
+
+function actionNeedsFallback(action) {
+  return (action.type === "type" || action.type === "select") && !String(action.value || "").trim();
+}
+
+function withRuntime(plan, patch) {
+  return {
+    ...plan,
+    runtime: {
+      privacyScope: "redacted-structured-observation",
+      keyVisibleToBrowser: false,
+      providerVisibleToBrowser: false,
+      modelNameVisibleToBrowser: false,
+      ...(plan.runtime || {}),
+      ...patch,
+    },
   };
 }
 

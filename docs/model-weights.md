@@ -24,7 +24,7 @@ Copy-Item config.example.json config.local.json
   "plannerModel": "cloud-planner-model",
   "plannerApiKey": "your-local-key",
   "edgeEndpoint": "https://example.com/api/v3/responses",
-  "edgeModel": "gemma-4b-computer-use",
+  "edgeModel": "",
   "edgeApiKey": "your-local-key",
   "publicPlannerLabel": "Cloud Planner Adapter",
   "publicEdgeLabel": "Gemma 4B Computer-Use"

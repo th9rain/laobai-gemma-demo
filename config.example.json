@@ -3,7 +3,7 @@
   "plannerModel": "cloud-planner-model",
   "plannerApiKey": "put-your-key-here",
   "edgeEndpoint": "https://your-edge-computer-use.example.com/api/v3/responses",
-  "edgeModel": "gemma-4b-computer-use",
+  "edgeModel": "",
   "edgeApiKey": "put-your-edge-key-here",
   "publicPlannerLabel": "Cloud Planner Adapter",
   "publicEdgeLabel": "Gemma 4B Computer-Use"

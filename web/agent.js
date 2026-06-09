@@ -17,7 +17,7 @@ window.bootAgent = async function bootAgent(options) {
   state.config = await loadPublicConfig();
   if (plannerLabel) plannerLabel.textContent = state.config.plannerLabel;
   if (edgeLabel) edgeLabel.textContent = state.config.edgeLabel;
-  if (plannerBadge) plannerBadge.textContent = state.config.plannerOnline ? "online" : "local fallback";
+  if (plannerBadge) plannerBadge.textContent = state.config.plannerOnline ? "ready" : "offline fallback";
 
   startButton?.addEventListener("click", () => run());
   resetButton?.addEventListener("click", () => window.location.reload());
@@ -36,7 +36,10 @@ window.bootAgent = async function bootAgent(options) {
 
     const observation = options.observe();
     const plan = await requestPlan(options.scenario, observation);
-    addTrace("规划完成", `${plan.summary || "已生成安全动作序列"}（planner handoff complete）`);
+    addTrace("隐私防火墙", runtimePrivacyText(plan.runtime));
+    addTrace("Planner 状态", runtimePlannerText(plan.runtime));
+    addTrace("Computer Use 状态", runtimeEdgeText(plan.runtime));
+    addTrace("规划完成", `${plan.summary || "已生成安全动作序列"}（${plan.source || "safe-policy"}）`);
 
     for (const action of plan.actions || []) {
       await executeAction(action);
@@ -136,6 +139,7 @@ function fallbackPlan(scenario) {
       ok: true,
       source: "static-html-policy",
       summary: "静态 HTML 模式：使用内置安全动作序列演示挂号流程。",
+      runtime: fallbackRuntime(),
       actions: [
         { type: "click", target: "ask-button", reason: "用户触发后先做端侧问询" },
         { type: "click", target: "answer-button", reason: "演示回答：两天，轻微恶心，无胸痛" },
@@ -151,6 +155,7 @@ function fallbackPlan(scenario) {
     ok: true,
     source: "static-html-policy",
     summary: "静态 HTML 模式：使用内置安全动作序列演示自动填表。",
+    runtime: fallbackRuntime(),
     actions: [
       { type: "type", target: "name", value: "李桂兰", reason: "填写本地记忆中的姓名" },
       { type: "type", target: "age", value: "70s", reason: "填写年龄段" },
@@ -161,6 +166,41 @@ function fallbackPlan(scenario) {
       { type: "guard", target: "submit-button", reason: "提交报名属于高风险动作，必须停住" },
     ],
   };
+}
+
+function fallbackRuntime() {
+  return {
+    privacyScope: "local-static-observation",
+    keyVisibleToBrowser: false,
+    providerVisibleToBrowser: false,
+    modelNameVisibleToBrowser: false,
+    plannerConfigured: false,
+    plannerHandoff: false,
+    plannerStatus: "static-html",
+    edgeConfigured: false,
+    edgeHandoff: false,
+    edgeStatus: "browser-executor",
+  };
+}
+
+function runtimePrivacyText(runtime = {}) {
+  const scope = runtime.privacyScope || "redacted-structured-observation";
+  const hidden = runtime.keyVisibleToBrowser === false && runtime.providerVisibleToBrowser === false && runtime.modelNameVisibleToBrowser === false;
+  return hidden
+    ? `${scope}；Key、底层服务和真实 model 不进入浏览器。`
+    : `${scope}；当前只展示演示所需的抽象状态。`;
+}
+
+function runtimePlannerText(runtime = {}) {
+  if (runtime.plannerHandoff) return "Cloud Planner Adapter 已返回安全 JSON action plan。";
+  if (runtime.plannerConfigured) return "Cloud Planner Adapter 已配置，但本轮使用安全 fallback。";
+  return "Cloud Planner Adapter 未启用，本轮使用本地安全策略。";
+}
+
+function runtimeEdgeText(runtime = {}) {
+  if (runtime.edgeHandoff) return "Gemma 4B Computer-Use adapter 已生成 GUI action。";
+  if (runtime.edgeConfigured) return "Gemma 4B Computer-Use adapter 已配置，但本轮使用浏览器执行器。";
+  return "浏览器执行器按安全 action schema 操作模拟手机控件。";
 }
 
 async function typeInto(element, value) {

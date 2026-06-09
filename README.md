@@ -37,14 +37,14 @@ Copy-Item config.example.json config.local.json
 ```
 
 然后在 `config.local.json` 中填写私有 planner endpoint、model 和 key。这个文件被 `.gitignore` 忽略，不会提交到 GitHub。
-如果端侧 Computer-Use 和云侧 planner 暂时共用一个私有代理服务，可以让 `edgeEndpoint/edgeApiKey` 留空；server 会默认复用 planner 配置。
+如果没有单独的端侧 Computer-Use adapter，可以让 `edgeModel` 留空；server 会使用浏览器执行器按安全 action schema 操作模拟手机控件。
 
 页面只显示：
 
 - `Gemma 4B Computer-Use`
 - `Cloud Planner Adapter`
 
-实际请求由 `tools/demo-server.mjs` 的 `/api/plan` 代理完成。浏览器前端只能看到 `/api/plan`，看不到真实 Key、真实 endpoint、真实 model 或底层服务。server 会先请求私有 planner adapter，再把规划交给端侧 Computer-Use adapter 生成最终 GUI action。
+实际请求由 `tools/demo-server.mjs` 的 `/api/plan` 代理完成。浏览器前端只能看到 `/api/plan`，看不到真实 Key、真实 endpoint、真实 model 或底层服务。server 会先请求私有 planner adapter，再把规划交给端侧 Computer-Use adapter 或浏览器执行器生成最终 GUI action。
 
 如果没有配置 Key，demo 会自动使用本地安全 fallback action，保证演示可运行。
 

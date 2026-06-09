@@ -1,11 +1,19 @@
 import http from "node:http";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { spawn } from "node:child_process";
 
-const port = Number(process.env.LAOBAI_DEMO_PORT || 49173 + Math.floor(Math.random() * 1000));
+const port = Number(process.env.LAOBAI_DEMO_PORT || await getFreePort());
 const base = `http://localhost:${port}`;
 
 async function main() {
+  const stdoutPath = path.join(os.tmpdir(), `laobai-verify-${port}.out`);
+  const stderrPath = path.join(os.tmpdir(), `laobai-verify-${port}.err`);
+  const stdout = fs.openSync(stdoutPath, "w");
+  const stderr = fs.openSync(stderrPath, "w");
   const server = spawn(process.execPath, ["tools/demo-server.mjs", "--no-open"], {
+    cwd: process.cwd(),
     env: {
       ...process.env,
       LAOBAI_DEMO_PORT: String(port),
@@ -17,7 +25,7 @@ async function main() {
       LAOBAI_PUBLIC_PLANNER_LABEL: "Gemini 4 30B Cloud Model",
       LAOBAI_PUBLIC_EDGE_LABEL: "Gemma 4B Computer-Use",
     },
-    stdio: "ignore",
+    stdio: ["ignore", stdout, stderr],
     detached: false,
   });
   try {
@@ -54,9 +62,30 @@ async function main() {
     assertAction(health, "guard", "confirm-button");
 
     console.log("Demo verification passed.");
+  } catch (error) {
+    const logs = [
+      fs.existsSync(stdoutPath) ? fs.readFileSync(stdoutPath, "utf8").trim() : "",
+      fs.existsSync(stderrPath) ? fs.readFileSync(stderrPath, "utf8").trim() : "",
+    ].filter(Boolean).join("\n");
+    if (logs) console.error(logs);
+    throw error;
   } finally {
     server.kill();
+    fs.closeSync(stdout);
+    fs.closeSync(stderr);
   }
+}
+
+function getFreePort() {
+  return new Promise((resolve, reject) => {
+    const probe = http.createServer();
+    probe.listen(0, "127.0.0.1", () => {
+      const address = probe.address();
+      const port = typeof address === "object" && address ? address.port : 0;
+      probe.close(() => resolve(port));
+    });
+    probe.on("error", reject);
+  });
 }
 
 function assertAction(plan, type, target) {

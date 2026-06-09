@@ -17,8 +17,8 @@
 2. 页面展示一个竖屏手机报名表。
 3. 点击 `启动 Agent`。
 4. 右侧展示：
-   - Edge Computer-Use Policy
-   - Cloud 30B Planner
+   - Gemma 4B Computer-Use
+   - Gemini 4 30B Cloud Planner
 5. Agent 自动填写：
    - 李桂兰
    - 70s
@@ -54,5 +54,5 @@
 ```
 
 ```text
-界面上看不到 Key，也看不到底层供应商。演示中只展示端侧 Computer-Use 能力和云侧 30B Planner 的协作。
+界面上看不到 Key，也看不到底层转发服务。演示中只展示 Gemma 4B Computer-Use 和 Gemini 4 30B Cloud Planner 的协作。
 ```

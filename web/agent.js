@@ -4,7 +4,7 @@ export async function bootAgent(options) {
   const state = {
     running: false,
     step: 0,
-    config: { plannerLabel: "Cloud 30B Planner", edgeLabel: "Edge Computer-Use Policy", plannerOnline: false },
+    config: { plannerLabel: "Gemini 4 30B Cloud Planner", edgeLabel: "Gemma 4B Computer-Use", plannerOnline: false },
   };
 
   const trace = document.querySelector("[data-trace]");

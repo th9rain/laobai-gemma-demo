@@ -26,7 +26,7 @@
 
 ## 模型调用与 Key
 
-页面上不会展示 API Key，也不会展示具体供应商。
+页面上不会展示 API Key，也不会展示具体底层供应商或转发服务。
 
 公开仓库只提交 `config.example.json`。本地演示时复制一份：
 
@@ -38,10 +38,10 @@ Copy-Item config.example.json config.local.json
 
 页面只显示：
 
-- `Edge Computer-Use Policy`
-- `Cloud 30B Planner`
+- `Gemma 4B Computer-Use`
+- `Gemini 4 30B Cloud Planner`
 
-实际请求由 `tools/demo-server.mjs` 的 `/api/plan` 代理完成。浏览器前端只能看到 `/api/plan`，看不到真实 Key。
+实际请求由 `tools/demo-server.mjs` 的 `/api/plan` 代理完成。浏览器前端只能看到 `/api/plan`，看不到真实 Key、真实 endpoint 或底层转发服务。
 
 如果没有配置 Key，demo 会自动使用本地安全 fallback action，保证演示可运行。
 

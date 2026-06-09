@@ -83,19 +83,19 @@
       <section class="operator">
         <h1>Trigger 看病挂号</h1>
         <p>
-          这个页面模拟用户主动求助。端侧策略完成问询和屏幕执行，云侧 30B planner 只接收脱敏症状摘要，返回下一步 GUI 动作。
+          这个页面模拟用户主动求助。端侧 Gemma 4B Computer-Use 完成问询和屏幕执行，Gemini 4 30B 云侧 planner 只接收脱敏症状摘要，返回下一步 GUI 动作。
         </p>
         <div class="operator-panel">
           <div class="model-row">
             <div>
-              <strong data-edge-label>Edge Computer-Use Policy</strong>
+              <strong data-edge-label>Gemma 4B Computer-Use</strong>
               <span>问询、页面控制、风险守卫。</span>
             </div>
             <div class="pill">on-device</div>
           </div>
           <div class="model-row">
             <div>
-              <strong data-planner-label>Cloud 30B Planner</strong>
+              <strong data-planner-label>Gemini 4 30B Cloud Planner</strong>
               <span>脱敏挂号规划，返回 JSON action plan。</span>
             </div>
             <div class="pill" data-planner-badge>checking</div>

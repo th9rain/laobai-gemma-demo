@@ -21,10 +21,10 @@ Copy-Item config.example.json config.local.json
 ```json
 {
   "plannerEndpoint": "https://example.com/api/v3/responses",
-  "plannerModel": "cloud-planner-model",
+  "plannerModel": "gemini-4-30b-cloud-planner",
   "plannerApiKey": "your-local-key",
-  "publicPlannerLabel": "Cloud 30B Planner",
-  "publicEdgeLabel": "Edge Computer-Use Policy"
+  "publicPlannerLabel": "Gemini 4 30B Cloud Planner",
+  "publicEdgeLabel": "Gemma 4B Computer-Use"
 }
 ```
 
@@ -32,7 +32,7 @@ Copy-Item config.example.json config.local.json
 
 ## 替换真实模型
 
-后续如果接入真实 Gemma/Gemini/Gemma 端侧能力：
+后续如果接入真实 Gemma/Gemini 端侧能力：
 
 1. 保持前端 action schema 不变。
 2. 在 `tools/demo-server.mjs` 替换 planner endpoint。

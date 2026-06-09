@@ -1,5 +1,5 @@
 {
-  "version": "demo-v0.1",
+  "version": "demo-v0.2",
   "model": "gemma-local-embedding-demo",
   "note": "Tiny deterministic embedding demo asset for offline hackathon recording.",
   "items": [
@@ -12,7 +12,7 @@
     },
     {
       "id": "respiratory_fever",
-      "keywords": ["发烧", "咳嗽", "嗓子", "胸闷", "呼吸"],
+      "keywords": ["发热", "咳嗽", "嗓子", "胸闷", "呼吸"],
       "department": "呼吸内科",
       "hospital": "北京朝阳医院",
       "reason": "发热、咳嗽或胸闷优先建议呼吸内科。"

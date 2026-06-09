@@ -6,12 +6,13 @@ object HealthBookingWorkflow {
     fun initialState(): HealthDemoState = HealthDemoState()
 
     fun trigger(text: String): HealthDemoState {
+        val triggerText = text.ifBlank { "我胃不舒服，帮我挂号" }
         return HealthDemoState(
-            triggerText = text.ifBlank { "我胃不舒服，帮我挂号" },
+            triggerText = triggerText,
             stage = HealthStage.Asking,
             question = "您这个不舒服有多久了？有没有发热、呕吐、胸痛这些情况？",
             steps = listOf(
-                DemoStep("Trigger 触发", "用户主动说：${text.ifBlank { "我胃不舒服，帮我挂号" }}"),
+                DemoStep("Trigger 触发", "用户主动说：$triggerText"),
                 DemoStep("端侧问询", "老白先问持续时间、严重程度和危险信号，不做诊断"),
             )
         )
@@ -36,7 +37,7 @@ object HealthBookingWorkflow {
             localPlan
         } else {
             localPlan.copy(
-                reason = "演示云端 planner 返回：${cloudText.take(120)}\n本地 workflow 采用固定安全执行路径。",
+                reason = "云端 planner 返回：${cloudText.take(160)}\n端侧仍按安全工作流执行挂号页面操作。",
                 usedCloud = true,
             )
         }
@@ -48,13 +49,13 @@ object HealthBookingWorkflow {
             hospital = result.hospital,
             planReason = result.reason,
             cloudPlannerUsed = result.usedCloud,
-            cloudPlannerStatus = if (result.usedCloud) "已调用演示云端 planner" else "未调用云端，使用本地 Gemma workflow",
+            cloudPlannerStatus = if (result.usedCloud) "已调用 Ark 云端 planner" else "未调用云端，使用本地 Gemma workflow",
             bookingPageOpened = true,
             stoppedBeforeConfirm = SafetyGuard.shouldStopBefore("确认挂号"),
             steps = state.steps + listOf(
                 DemoStep("本地知识库检索", result.reason),
                 DemoStep("挂号计划", "医院：${result.hospital}；科室：${result.department}；建议：明天上午"),
-                DemoStep("模拟打开挂号页", "已选择 ${result.hospital} / ${result.department}"),
+                DemoStep("GUI 自动化", "打开模拟挂号页，自动选择 ${result.hospital} / ${result.department}"),
                 DemoStep("安全守卫", SafetyGuard.stopMessage("确认挂号 / 支付 / 验证码"), RiskLevel.High),
             )
         )

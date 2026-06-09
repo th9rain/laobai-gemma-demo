@@ -47,7 +47,7 @@ object ArkCloudPlanner {
             } else {
                 connection.errorStream
             }
-            val response = stream.bufferedReader().use { it.readText() }
+            val response = stream.bufferedReader(Charsets.UTF_8).use { it.readText() }
             if (connection.responseCode !in 200..299) {
                 error("Ark API ${connection.responseCode}: $response")
             }

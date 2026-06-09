@@ -8,6 +8,6 @@ object SafetyGuard {
     }
 
     fun stopMessage(target: String): String {
-        return "老白已经停在「$target」前。请您自己检查信息，确认无误后再手动操作。"
+        return "老白已经停在「$target」前。请老人或家人检查信息，确认无误后再手动操作。"
     }
 }

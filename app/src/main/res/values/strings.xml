@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">老白 Gemma Agent</string>
+    <string name="accessibility_service_label">老白 Agent 手机操作服务</string>
+    <string name="accessibility_service_description">观察当前屏幕文字，帮助完成演示表单和挂号流程，并在提交、支付、验证码等高风险动作前停止。</string>
+</resources>

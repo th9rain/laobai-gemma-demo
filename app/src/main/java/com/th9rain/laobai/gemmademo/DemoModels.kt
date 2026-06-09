@@ -50,7 +50,7 @@ data class HealthDemoState(
     val hospital: String = "",
     val planReason: String = "",
     val cloudPlannerUsed: Boolean = false,
-    val cloudPlannerStatus: String = "未配置 API Key，默认走本地 workflow",
+    val cloudPlannerStatus: String = "未配置云端 API，默认走本地 workflow",
     val bookingPageOpened: Boolean = false,
     val stoppedBeforeConfirm: Boolean = false,
     val steps: List<DemoStep> = emptyList(),
@@ -75,3 +75,18 @@ data class PlannerResult(
     val reason: String,
     val usedCloud: Boolean,
 )
+
+object AgentBroadcasts {
+    const val ACTION_STATUS = "com.th9rain.laobai.gemmademo.AGENT_STATUS"
+    const val EXTRA_PAGE = "page"
+    const val EXTRA_STATUS = "status"
+    const val EXTRA_STAGE = "stage"
+    const val PAGE_FORM = "form"
+    const val PAGE_HEALTH = "health"
+}
+
+object AgentPrefs {
+    const val FILE = "laobai_agent_prefs"
+    const val KEY_CLOUD_ENABLED = "cloud_enabled"
+    const val KEY_ARK_API_KEY = "ark_api_key"
+}

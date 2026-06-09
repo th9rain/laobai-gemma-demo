@@ -20,9 +20,9 @@ jobs:
       - name: Copy APK into releases folder
         run: |
           mkdir -p releases
-          cp app/build/outputs/apk/release/app-release.apk releases/laobai-gemma-demo-v0.1.0.apk
+          cp app/build/outputs/apk/release/app-release.apk releases/laobai-gemma-demo-v0.2.0.apk
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: laobai-gemma-demo-v0.1.0
-          path: releases/laobai-gemma-demo-v0.1.0.apk
+          name: laobai-gemma-demo-v0.2.0
+          path: releases/laobai-gemma-demo-v0.2.0.apk

@@ -1,0 +1,22 @@
+<resources>
+    <item name="form_title" type="id" />
+    <item name="form_name_input" type="id" />
+    <item name="form_age_input" type="id" />
+    <item name="form_phone_input" type="id" />
+    <item name="form_area_input" type="id" />
+    <item name="form_contact_input" type="id" />
+    <item name="form_course_input" type="id" />
+    <item name="form_submit_button" type="id" />
+
+    <item name="health_title" type="id" />
+    <item name="health_status_text" type="id" />
+    <item name="health_symptom_input" type="id" />
+    <item name="health_start_button" type="id" />
+    <item name="health_question_text" type="id" />
+    <item name="health_answer_button" type="id" />
+    <item name="health_hospital_input" type="id" />
+    <item name="health_department_input" type="id" />
+    <item name="health_date_input" type="id" />
+    <item name="health_materials_input" type="id" />
+    <item name="health_confirm_button" type="id" />
+</resources>

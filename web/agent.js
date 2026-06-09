@@ -4,7 +4,7 @@ window.bootAgent = async function bootAgent(options) {
   const state = {
     running: false,
     step: 0,
-    config: { plannerLabel: "Cloud Planner Adapter", edgeLabel: "Gemma 4B Computer-Use", plannerOnline: false },
+    config: { plannerLabel: "Gemini 4 30B Cloud Model", edgeLabel: "Gemma 4B Computer-Use", plannerOnline: false },
   };
 
   const trace = document.querySelector("[data-trace]");
@@ -119,7 +119,7 @@ async function requestPlan(scenario, observation) {
 async function loadPublicConfig() {
   if (window.location.protocol === "file:") {
     return {
-      plannerLabel: "Cloud Planner Adapter",
+      plannerLabel: "Gemini 4 30B Cloud Model",
       edgeLabel: "Gemma 4B Computer-Use",
       plannerOnline: false,
     };
@@ -187,14 +187,14 @@ function runtimePrivacyText(runtime = {}) {
   const scope = runtime.privacyScope || "redacted-structured-observation";
   const hidden = runtime.keyVisibleToBrowser === false && runtime.providerVisibleToBrowser === false && runtime.modelNameVisibleToBrowser === false;
   return hidden
-    ? `${scope}；Key、底层服务和真实 model 不进入浏览器。`
+    ? `${scope}；Key、底层服务和真实调用参数不进入浏览器。`
     : `${scope}；当前只展示演示所需的抽象状态。`;
 }
 
 function runtimePlannerText(runtime = {}) {
-  if (runtime.plannerHandoff) return "Cloud Planner Adapter 已返回安全 JSON action plan。";
-  if (runtime.plannerConfigured) return "Cloud Planner Adapter 已配置，但本轮使用安全 fallback。";
-  return "Cloud Planner Adapter 未启用，本轮使用本地安全策略。";
+  if (runtime.plannerHandoff) return "Gemini 4 30B 云侧模型已返回安全 JSON action plan。";
+  if (runtime.plannerConfigured) return "Gemini 4 30B 云侧模型已配置，但本轮使用安全 fallback。";
+  return "Gemini 4 30B 云侧模型未启用，本轮使用本地安全策略。";
 }
 
 function runtimeEdgeText(runtime = {}) {

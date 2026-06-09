@@ -14,7 +14,7 @@ async function main() {
       LAOBAI_PLANNER_API_KEY: "",
       LAOBAI_EDGE_ENDPOINT: "",
       LAOBAI_EDGE_API_KEY: "",
-      LAOBAI_PUBLIC_PLANNER_LABEL: "Cloud Planner Adapter",
+      LAOBAI_PUBLIC_PLANNER_LABEL: "Gemini 4 30B Cloud Model",
       LAOBAI_PUBLIC_EDGE_LABEL: "Gemma 4B Computer-Use",
     },
     stdio: "ignore",
@@ -23,7 +23,7 @@ async function main() {
   try {
     await waitForServer();
     const publicConfig = await postJson("/api/public-config", null, "GET");
-    assert(publicConfig.plannerLabel === "Cloud Planner Adapter", "planner label mismatch");
+    assert(publicConfig.plannerLabel === "Gemini 4 30B Cloud Model", "planner label mismatch");
     assert(publicConfig.edgeLabel === "Gemma 4B Computer-Use", "edge label mismatch");
 
     const form = await postJson("/api/plan", {

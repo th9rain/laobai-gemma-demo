@@ -26,7 +26,7 @@ HTML 手机模拟页
 页面上只展示两个演示能力：
 
 - `Gemma 4B Computer-Use`：端侧屏幕理解、控件定位、动作执行。
-- `Cloud Planner Adapter`：复杂规划，生成候选计划。
+- `Gemini 4 30B Cloud Model`：云侧复杂规划，生成候选计划。
 - `Gemma 4B Computer-Use` adapter：把候选计划转成可执行 GUI action；没有单独 edge model 时可复用私有 planner adapter，失败后才退回浏览器执行器。
 
 实际 endpoint、model、key 存在本地 `config.local.json` 或环境变量里。公开仓库不提交真实 Key，也不暴露底层服务。

@@ -42,7 +42,7 @@ Copy-Item config.example.json config.local.json
 页面只显示：
 
 - `Gemma 4B Computer-Use`
-- `Cloud Planner Adapter`
+- `Gemini 4 30B Cloud Model`
 
 实际请求由 `tools/demo-server.mjs` 的 `/api/plan` 代理完成。浏览器前端只能看到 `/api/plan`，看不到真实 Key、真实 endpoint、真实 model 或底层服务。server 会先请求私有 planner adapter，再把规划交给 Computer-Use adapter 生成最终 GUI action；如果 adapter 不可用，才退回浏览器执行器。
 

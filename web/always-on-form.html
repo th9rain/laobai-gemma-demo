@@ -67,7 +67,7 @@
       <section class="operator">
         <h1>Always-on 自动填表</h1>
         <p>
-          这个页面模拟老人打开报名表后，端侧 Gemma 4B Computer-Use 主动识别页面，并请求 Cloud Planner Adapter 生成安全动作序列。执行器会真实操作左侧手机界面里的控件。
+          这个页面模拟老人打开报名表后，端侧 Gemma 4B Computer-Use 主动识别页面，并请求 Gemini 4 30B 云侧模型生成安全动作序列。执行器会真实操作左侧手机界面里的控件。
         </p>
         <div class="operator-panel">
           <div class="model-row">
@@ -79,7 +79,7 @@
           </div>
           <div class="model-row">
             <div>
-              <strong data-planner-label>Cloud Planner Adapter</strong>
+              <strong data-planner-label>Gemini 4 30B Cloud Model</strong>
               <span>接收脱敏页面摘要，返回 JSON action plan。</span>
             </div>
             <div class="pill" data-planner-badge>checking</div>

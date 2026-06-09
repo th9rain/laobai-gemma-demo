@@ -5,6 +5,6 @@
   "edgeEndpoint": "https://your-edge-computer-use.example.com/api/v3/responses",
   "edgeModel": "",
   "edgeApiKey": "put-your-edge-key-here",
-  "publicPlannerLabel": "Cloud Planner Adapter",
+  "publicPlannerLabel": "Gemini 4 30B Cloud Model",
   "publicEdgeLabel": "Gemma 4B Computer-Use"
 }

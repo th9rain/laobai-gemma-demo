@@ -32,6 +32,7 @@ Copy-Item config.example.json config.local.json
 ```
 
 `config.local.json` 已加入 `.gitignore`，不会提交。
+`edgeModel` 留空时会复用 `plannerModel` 做第二段 Computer-Use action 转换；如果你有独立端侧 adapter，再单独填写 `edgeEndpoint/edgeModel/edgeApiKey`。
 
 ## 替换真实模型
 

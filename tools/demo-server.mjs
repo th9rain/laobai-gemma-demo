@@ -80,9 +80,11 @@ async function loadConfig() {
   const localPath = path.join(rootDir, "config.local.json");
   let merged = defaults;
   try {
-    const text = (await fs.readFile(localPath, "utf8")).replace(/^\uFEFF/, "");
-    const local = JSON.parse(text);
-    merged = { ...defaults, ...local };
+    if (process.env.LAOBAI_SKIP_LOCAL_CONFIG !== "1") {
+      const text = (await fs.readFile(localPath, "utf8")).replace(/^\uFEFF/, "");
+      const local = JSON.parse(text);
+      merged = { ...defaults, ...local };
+    }
   } catch {
     merged = defaults;
   }
@@ -90,14 +92,15 @@ async function loadConfig() {
     ...merged,
     ...publicLabels,
     edgeEndpoint: merged.edgeEndpoint || merged.plannerEndpoint,
-    edgeModel: explicitEdgeModel(merged) ? merged.edgeModel : "",
+    edgeModel: effectiveEdgeModel(merged),
     edgeApiKey: merged.edgeApiKey || merged.plannerApiKey,
   };
 }
 
-function explicitEdgeModel(configData) {
+function effectiveEdgeModel(configData) {
   const value = String(configData.edgeModel || "").trim();
-  return Boolean(value && value !== "gemma-4b-computer-use" && value !== "your-edge-model");
+  if (value && value !== "your-edge-model") return value;
+  return String(configData.plannerModel || "").trim();
 }
 
 async function plannerRequest(payload) {
@@ -142,9 +145,7 @@ async function edgeComputerUseRequest(payload, cloudPlan) {
   if (!config.edgeApiKey || !config.edgeEndpoint || !config.edgeModel) {
     return withRuntime({
       ...cloudPlan,
-      note: config.edgeModel
-        ? "Edge computer-use adapter not configured; safe action policy used."
-        : "Browser executor used for GUI actions after planner validation.",
+      note: "Browser executor used for GUI actions after planner validation.",
     }, {
       edgeConfigured: false,
       edgeHandoff: false,
@@ -159,7 +160,7 @@ async function edgeComputerUseRequest(payload, cloudPlan) {
     apiKey: config.edgeApiKey,
     prompt,
     fallback: cloudPlan,
-    timeoutMs: Number(process.env.LAOBAI_EDGE_TIMEOUT_MS || 12000),
+    timeoutMs: Number(process.env.LAOBAI_EDGE_TIMEOUT_MS || 20000),
     successSource: "edge-computer-use",
     fallbackSource: cloudPlan.source || "edge-policy",
     unavailableNote: "Edge computer-use handoff unavailable; safe action policy used.",
@@ -256,14 +257,14 @@ function buildPlannerPrompt(payload, fallback) {
 
 function buildEdgePrompt(payload, plan) {
   return [
-    "You are Gemma 4B Computer-Use for a senior-assistance GUI agent demo.",
+    "You are the Computer-Use adapter for a senior-assistance GUI agent demo.",
     "Return ONLY strict JSON. Do not include markdown.",
     "Schema: {\"summary\":\"short Chinese status\",\"actions\":[{\"type\":\"click|type|select|wait|guard\",\"target\":\"element id\",\"value\":\"optional\",\"reason\":\"Chinese reason\"}]}",
-    "You control only the visible simulated phone UI. Convert the cloud plan into safe GUI actions.",
+    "Task: validate and return the safe GUI action list below using the same element ids.",
+    "Do not add explanations outside JSON.",
     "Never click submit, confirm, payment, OTP, authorize, or delete targets. Use guard for those.",
     `Scenario: ${payload?.scenario || "unknown"}`,
-    `Screen observation: ${JSON.stringify(payload?.observation || {}, null, 2)}`,
-    `Cloud plan candidate: ${JSON.stringify(plan, null, 2)}`,
+    `Candidate actions: ${JSON.stringify(plan.actions || [], null, 2)}`,
   ].join("\n\n");
 }
 

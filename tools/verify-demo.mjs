@@ -9,6 +9,11 @@ async function main() {
     env: {
       ...process.env,
       LAOBAI_DEMO_PORT: String(port),
+      LAOBAI_SKIP_LOCAL_CONFIG: "1",
+      LAOBAI_PLANNER_ENDPOINT: "",
+      LAOBAI_PLANNER_API_KEY: "",
+      LAOBAI_EDGE_ENDPOINT: "",
+      LAOBAI_EDGE_API_KEY: "",
       LAOBAI_PUBLIC_PLANNER_LABEL: "Cloud Planner Adapter",
       LAOBAI_PUBLIC_EDGE_LABEL: "Gemma 4B Computer-Use",
     },

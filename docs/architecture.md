@@ -11,7 +11,7 @@ PowerShell 启动脚本
   -> tools/demo-server.mjs
     -> 静态托管 web/*.html
     -> /api/public-config 暴露安全显示名
-    -> /api/plan 隐藏 Key 并代理云端 planner
+    -> /api/plan 隐藏 Key 并代理云端 planner / 端侧 action adapter
 
 HTML 手机模拟页
   -> web/agent.js
@@ -26,9 +26,10 @@ HTML 手机模拟页
 页面上只展示两个比赛叙事能力：
 
 - `Gemma 4B Computer-Use`：端侧屏幕理解、控件定位、动作执行。
-- `Gemini 4 30B Cloud Planner`：云侧复杂规划，返回 JSON action plan。
+- `Gemini 4 30B Cloud Planner`：云侧复杂规划，生成候选计划。
+- `Gemma 4B Computer-Use`：把候选计划转成可执行 GUI action。
 
-实际云端 endpoint、model、key 存在本地 `config.local.json` 或环境变量里。公开仓库不提交真实 Key，也不暴露底层转发服务。
+实际 endpoint、model、key 存在本地 `config.local.json` 或环境变量里。公开仓库不提交真实 Key，也不暴露底层转发服务。
 
 ## Planner 输出协议
 

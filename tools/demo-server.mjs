@@ -69,21 +69,35 @@ async function loadConfig() {
     plannerEndpoint: process.env.LAOBAI_PLANNER_ENDPOINT || "",
     plannerModel: process.env.LAOBAI_PLANNER_MODEL || "gemini-4-30b-cloud-planner",
     plannerApiKey: process.env.LAOBAI_PLANNER_API_KEY || "",
+    edgeEndpoint: process.env.LAOBAI_EDGE_ENDPOINT || "",
+    edgeModel: process.env.LAOBAI_EDGE_MODEL || "gemma-4b-computer-use",
+    edgeApiKey: process.env.LAOBAI_EDGE_API_KEY || "",
     publicPlannerLabel: process.env.LAOBAI_PUBLIC_PLANNER_LABEL || "Gemini 4 30B Cloud Planner",
     publicEdgeLabel: process.env.LAOBAI_PUBLIC_EDGE_LABEL || "Gemma 4B Computer-Use",
   };
   const localPath = path.join(rootDir, "config.local.json");
+  let merged = defaults;
   try {
     const text = (await fs.readFile(localPath, "utf8")).replace(/^\uFEFF/, "");
     const local = JSON.parse(text);
-    return { ...defaults, ...local };
+    merged = { ...defaults, ...local };
   } catch {
-    return defaults;
+    merged = defaults;
   }
+  return {
+    ...merged,
+    edgeEndpoint: merged.edgeEndpoint || merged.plannerEndpoint,
+    edgeApiKey: merged.edgeApiKey || merged.plannerApiKey,
+  };
 }
 
 async function plannerRequest(payload) {
   const fallback = fallbackPlan(payload);
+  const cloudPlan = await cloudPlannerRequest(payload, fallback);
+  return edgeComputerUseRequest(payload, cloudPlan);
+}
+
+async function cloudPlannerRequest(payload, fallback) {
   if (!config.plannerApiKey || !config.plannerEndpoint) {
     return {
       ...fallback,
@@ -93,18 +107,51 @@ async function plannerRequest(payload) {
   }
 
   const prompt = buildPlannerPrompt(payload, fallback);
+  return invokePlanningModel({
+    endpoint: config.plannerEndpoint,
+    model: config.plannerModel,
+    apiKey: config.plannerApiKey,
+    prompt,
+    fallback,
+    timeoutMs: Number(process.env.LAOBAI_PLANNER_TIMEOUT_MS || 4500),
+    unavailableNote: "Planner handoff unavailable; safe edge policy used.",
+  });
+}
+
+async function edgeComputerUseRequest(payload, cloudPlan) {
+  if (!config.edgeApiKey || !config.edgeEndpoint) {
+    return {
+      ...cloudPlan,
+      source: "edge-policy",
+      note: "Edge computer-use adapter not configured; safe action policy used.",
+    };
+  }
+
+  const prompt = buildEdgePrompt(payload, cloudPlan);
+  return invokePlanningModel({
+    endpoint: config.edgeEndpoint,
+    model: config.edgeModel,
+    apiKey: config.edgeApiKey,
+    prompt,
+    fallback: cloudPlan,
+    timeoutMs: Number(process.env.LAOBAI_EDGE_TIMEOUT_MS || 3500),
+    unavailableNote: "Edge computer-use handoff unavailable; safe action policy used.",
+  });
+}
+
+async function invokePlanningModel({ endpoint, model, apiKey, prompt, fallback, timeoutMs, unavailableNote }) {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), Number(process.env.LAOBAI_PLANNER_TIMEOUT_MS || 4500));
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const response = await fetch(config.plannerEndpoint, {
+    const response = await fetch(endpoint, {
       method: "POST",
       signal: controller.signal,
       headers: {
-        Authorization: `Bearer ${config.plannerApiKey}`,
+        Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: config.plannerModel,
+        model,
         input: [
           {
             role: "user",
@@ -119,7 +166,7 @@ async function plannerRequest(payload) {
       return {
         ...fallback,
         source: "edge-policy",
-        note: "Planner handoff unavailable; safe edge policy used.",
+        note: unavailableNote,
       };
     }
     const text = extractPlannerText(raw);
@@ -129,7 +176,7 @@ async function plannerRequest(payload) {
     return {
       ...fallback,
       source: "edge-policy",
-      note: "Planner handoff timed out; safe edge policy used.",
+      note: unavailableNote,
     };
   }
 }
@@ -144,6 +191,19 @@ function buildPlannerPrompt(payload, fallback) {
     `Scenario: ${payload?.scenario || "unknown"}`,
     `Observation: ${JSON.stringify(payload?.observation || {}, null, 2)}`,
     `Recommended fallback actions: ${JSON.stringify(fallback.actions, null, 2)}`,
+  ].join("\n\n");
+}
+
+function buildEdgePrompt(payload, plan) {
+  return [
+    "You are Gemma 4B Computer-Use for a senior-assistance GUI agent demo.",
+    "Return ONLY strict JSON. Do not include markdown.",
+    "Schema: {\"summary\":\"short Chinese status\",\"actions\":[{\"type\":\"click|type|select|wait|guard\",\"target\":\"element id\",\"value\":\"optional\",\"reason\":\"Chinese reason\"}]}",
+    "You control only the visible simulated phone UI. Convert the cloud plan into safe GUI actions.",
+    "Never click submit, confirm, payment, OTP, authorize, or delete targets. Use guard for those.",
+    `Scenario: ${payload?.scenario || "unknown"}`,
+    `Screen observation: ${JSON.stringify(payload?.observation || {}, null, 2)}`,
+    `Cloud plan candidate: ${JSON.stringify(plan, null, 2)}`,
   ].join("\n\n");
 }
 

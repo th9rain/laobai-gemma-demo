@@ -1,0 +1,7 @@
+{
+  "plannerEndpoint": "https://your-cloud-planner.example.com/api/v3/responses",
+  "plannerModel": "cloud-30b-planner",
+  "plannerApiKey": "put-your-key-here",
+  "publicPlannerLabel": "Cloud 30B Planner",
+  "publicEdgeLabel": "Edge Computer-Use Policy"
+}

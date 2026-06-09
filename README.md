@@ -1,97 +1,96 @@
-# 老白 Gemma Agent APK
+# 老白 Agent Web Demo
 
-`laobai-gemma-demo` 是一个面向比赛路演和手机实测的 Android Agent Demo。它不再只是页面内状态切换，而是通过 Android `AccessibilityService` 观察和操作真实 Android 控件：读取页面节点、填写输入框、点击低风险按钮，并在提交、支付、验证码等高风险动作前停止。
+这是一个面向路演录屏的端云结合 Agent Web Demo。在电脑上运行本地 server 后，会自动打开两个竖屏手机比例的 HTML 页面，并由 Agent 自动执行任务。
 
-项目只保留两条核心 case：
+核心 case：
 
-- Demo 1：Always-on 自动填表助手
-- Demo 2：Trigger 看病挂号助手
+- `Always-on 自动填表`：识别社区报名表，自动填写常用资料，停在提交前。
+- `Trigger 看病挂号`：用户触发“我胃不舒服，帮我挂号”，完成问询、科室/医院规划、模拟挂号，停在确认/支付/验证码前。
 
-## APK 下载
+## 快速开始
 
-APK 提交在仓库内：
+需要本机安装 Node.js 18+。
 
-```text
-releases/laobai-gemma-demo-v0.2.0.apk
+```powershell
+.\run-demo-server.ps1
 ```
 
-安装后需要在 Android 系统设置里启用无障碍服务：
+打开首页后选择任一 demo。
 
-```text
-设置 -> 无障碍 -> 老白 Agent 手机操作服务
+也可以直接启动指定 demo：
+
+```powershell
+.\run-always-on-demo.ps1
+.\run-trigger-demo.ps1
 ```
 
-不启用无障碍服务时，首页可以打开，但 Agent 不能自动操作页面。
+## 模型调用与 Key
 
-## Demo 1：Always-on 自动填表
+页面上不会展示 API Key，也不会展示具体供应商。
 
-表单页面：`北京市朝阳区社区智慧课堂报名表`
+公开仓库只提交 `config.example.json`。本地演示时复制一份：
 
-内置虚拟老人资料：
-
-- 姓名：李桂兰
-- 年龄段：70s
-- 手机号：138****2675
-- 居住区域：北京市朝阳区望京街道
-- 紧急联系人：女儿 王敏
-- 报名课程：智能手机基础课
-
-演示流程：
-
-1. 打开 App，确认无障碍服务已启用。
-2. 点击 `Demo 1：Always-on 自动填表`。
-3. 老白识别当前页面是报名表。
-4. 无障碍服务向真实输入框写入本地记忆中的虚拟资料。
-5. 停在 `提交报名` 前，不自动提交。
-
-## Demo 2：Trigger 看病挂号
-
-默认触发语：
-
-```text
-我胃不舒服，帮我挂号
+```powershell
+Copy-Item config.example.json config.local.json
 ```
 
-北京医院候选：
+然后在 `config.local.json` 中填写本地 planner endpoint、model 和 key。这个文件被 `.gitignore` 忽略，不会提交到 GitHub。
 
-- 北京协和医院
-- 北京大学人民医院
-- 北京朝阳医院
+页面只显示：
 
-演示流程：
+- `Edge Computer-Use Policy`
+- `Cloud 30B Planner`
 
-1. 打开 App，确认无障碍服务已启用。
-2. 可选：在首页开启 Ark 云端 planner，并输入 API Key。
-3. 点击 `Demo 2：Trigger 看病挂号`。
-4. 老白自动点击 `开始问询`，询问持续时间和危险信号。
-5. 老白自动点击演示回答，使用本地 embedding 知识库推荐 `消化内科`。
-6. 如果启用了 Ark planner，会向云端发送脱敏摘要并显示“已调用 Ark 云端 planner”。
-7. 老白填写模拟挂号页：医院、科室、时间、准备材料。
-8. 停在 `确认挂号 / 支付 / 验证码` 前，不自动确认。
+实际请求由 `tools/demo-server.mjs` 的 `/api/plan` 代理完成。浏览器前端只能看到 `/api/plan`，看不到真实 Key。
 
-## 模型方案
+如果没有配置 Key，demo 会自动使用本地安全 fallback action，保证演示可运行。
 
-- 端侧 Gemma：当前版本提供模型槽和本地 workflow 兜底；真实权重接入后再显示真实加载状态。
-- 本地知识库：内置 `app/src/main/assets/embedding_kb.json`，用于挂号科室推荐演示。
-- 云端 planner：支持在 App 内填入 Ark API Key 后调用 Ark Responses API。API Key 只保存在手机本机偏好里，不写入仓库。
-- Gemma 主模型权重：不打进 APK，避免安装包过大；后续应通过 GitHub Release 附件或 App 内导入槽交付。
+## Demo 行为
+
+### Always-on 自动填表
+
+执行链路：
+
+1. 点击 `启动 Agent` 或用 `?autostart=1` 自动启动。
+2. 页面生成脱敏观察摘要。
+3. 本地 server 调用云侧 planner 或使用 fallback。
+4. 执行器逐步操作模拟手机页面：
+   - 输入姓名、年龄段、手机号、居住区域、紧急联系人
+   - 选择报名课程
+   - 停在 `提交报名`
+5. 右侧实时显示每一步 action 和原因。
+
+### Trigger 看病挂号
+
+执行链路：
+
+1. 点击 `启动 Agent` 或用 `?autostart=1` 自动启动。
+2. Agent 点击 `开始问询`。
+3. Agent 点击演示回答。
+4. planner 输出医院、科室、时间、准备材料。
+5. 执行器填写模拟挂号页面。
+6. 停在 `确认挂号 / 支付 / 验证码` 前。
 
 ## 隐私边界
 
-- 原始页面、身份证、完整手机号、验证码、病历原文默认不上云。
-- 云端 planner 只接收脱敏症状摘要和本地建议。
-- 高风险动作统一停止：提交、确认挂号、支付、验证码、授权、删除。
+- 原始屏幕不上传。
+- 身份证、完整手机号、验证码、病历原文不上云。
+- 云端 planner 只接收结构化脱敏摘要。
+- 高风险动作必须 `guard`，不能自动执行。
 
-## 本地构建
-
-```powershell
-.\gradlew.bat assembleRelease
-```
-
-生成路径：
+## 文件结构
 
 ```text
-app/build/outputs/apk/release/app-release.apk
+web/
+  index.html
+  always-on-form.html
+  trigger-health.html
+  styles.css
+  agent.js
+tools/
+  demo-server.mjs
+config.example.json
+run-demo-server.ps1
+run-always-on-demo.ps1
+run-trigger-demo.ps1
 ```
-
-Release 构建使用 debug signing，方便直接侧载安装测试。

@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>老白 Agent Web Demo</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="page" style="grid-template-columns:minmax(420px,720px);">
+      <section class="operator">
+        <h1>老白 Agent Web Demo</h1>
+        <p>
+          电脑端运行的手机竖屏模拟 demo。页面不展示 API Key；模型调用通过本地 server 代理。
+        </p>
+        <div class="operator-panel">
+          <div class="model-row">
+            <div>
+              <strong>Demo 1：Always-on 自动填表</strong>
+              <span>主动识别报名表，自动填写常用资料，提交前停止。</span>
+            </div>
+            <a class="primary-btn" href="./always-on-form.html?autostart=1" style="text-decoration:none; display:inline-grid; place-items:center;">打开</a>
+          </div>
+          <div class="model-row">
+            <div>
+              <strong>Demo 2：Trigger 看病挂号</strong>
+              <span>用户触发问询，规划医院/科室，确认挂号前停止。</span>
+            </div>
+            <a class="secondary-btn" href="./trigger-health.html?autostart=1" style="text-decoration:none; display:inline-grid; place-items:center;">打开</a>
+          </div>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

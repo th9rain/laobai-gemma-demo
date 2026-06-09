@@ -1,0 +1,304 @@
+import http from "node:http";
+import fs from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { spawn } from "node:child_process";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const rootDir = path.resolve(__dirname, "..");
+const webDir = path.join(rootDir, "web");
+const port = Number(process.env.LAOBAI_DEMO_PORT || 4173);
+
+const args = new Map();
+for (let i = 2; i < process.argv.length; i += 1) {
+  const arg = process.argv[i];
+  if (arg.startsWith("--")) {
+    args.set(arg.slice(2), process.argv[i + 1]?.startsWith("--") ? true : process.argv[++i] ?? true);
+  }
+}
+
+const demoMap = {
+  "always-on": "/always-on-form.html?autostart=1",
+  trigger: "/trigger-health.html?autostart=1",
+  form: "/always-on-form.html?autostart=1",
+  health: "/trigger-health.html?autostart=1",
+};
+
+const config = await loadConfig();
+
+const server = http.createServer(async (req, res) => {
+  try {
+    const url = new URL(req.url || "/", `http://localhost:${port}`);
+    if (req.method === "GET" && url.pathname === "/") {
+      return serveFile(res, path.join(webDir, "index.html"));
+    }
+    if (req.method === "GET" && url.pathname === "/api/public-config") {
+      return sendJson(res, {
+        plannerLabel: config.publicPlannerLabel,
+        edgeLabel: config.publicEdgeLabel,
+        plannerOnline: Boolean(config.plannerApiKey && config.plannerEndpoint),
+      });
+    }
+    if (req.method === "POST" && url.pathname === "/api/plan") {
+      const body = await readJson(req);
+      const plan = await plannerRequest(body);
+      return sendJson(res, plan);
+    }
+    if (req.method === "GET") {
+      const safePath = safeJoin(webDir, url.pathname === "/" ? "index.html" : url.pathname);
+      return serveFile(res, safePath);
+    }
+    res.writeHead(405);
+    res.end("Method Not Allowed");
+  } catch (error) {
+    sendJson(res, { ok: false, error: String(error?.message || error) }, 500);
+  }
+});
+
+server.listen(port, () => {
+  const demo = String(args.get("demo") || "");
+  const target = `http://localhost:${port}${demoMap[demo] || "/"}`;
+  console.log(`LaoBai web demo server running: ${target}`);
+  if (args.get("no-open") !== true) {
+    openBrowser(target);
+  }
+});
+
+async function loadConfig() {
+  const defaults = {
+    plannerEndpoint: process.env.LAOBAI_PLANNER_ENDPOINT || "",
+    plannerModel: process.env.LAOBAI_PLANNER_MODEL || "cloud-30b-planner",
+    plannerApiKey: process.env.LAOBAI_PLANNER_API_KEY || "",
+    publicPlannerLabel: process.env.LAOBAI_PUBLIC_PLANNER_LABEL || "Cloud 30B Planner",
+    publicEdgeLabel: process.env.LAOBAI_PUBLIC_EDGE_LABEL || "Edge Computer-Use Policy",
+  };
+  const localPath = path.join(rootDir, "config.local.json");
+  try {
+    const text = (await fs.readFile(localPath, "utf8")).replace(/^\uFEFF/, "");
+    const local = JSON.parse(text);
+    return { ...defaults, ...local };
+  } catch {
+    return defaults;
+  }
+}
+
+async function plannerRequest(payload) {
+  const fallback = fallbackPlan(payload);
+  if (!config.plannerApiKey || !config.plannerEndpoint) {
+    return {
+      ...fallback,
+      source: "edge-policy",
+      note: "Local policy fallback. Configure config.local.json to enable cloud planner.",
+    };
+  }
+
+  const prompt = buildPlannerPrompt(payload, fallback);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), Number(process.env.LAOBAI_PLANNER_TIMEOUT_MS || 4500));
+  try {
+    const response = await fetch(config.plannerEndpoint, {
+      method: "POST",
+      signal: controller.signal,
+      headers: {
+        Authorization: `Bearer ${config.plannerApiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: config.plannerModel,
+        input: [
+          {
+            role: "user",
+            content: [{ type: "input_text", text: prompt }],
+          },
+        ],
+      }),
+    });
+    clearTimeout(timer);
+    const raw = await response.text();
+    if (!response.ok) {
+      return {
+        ...fallback,
+        source: "edge-policy",
+        note: "Planner handoff unavailable; safe edge policy used.",
+      };
+    }
+    const text = extractPlannerText(raw);
+    return normalizePlan(text, fallback);
+  } catch (error) {
+    clearTimeout(timer);
+    return {
+      ...fallback,
+      source: "edge-policy",
+      note: "Planner handoff timed out; safe edge policy used.",
+    };
+  }
+}
+
+function buildPlannerPrompt(payload, fallback) {
+  return [
+    "You are the cloud planner for a senior-assistance GUI agent demo.",
+    "Return ONLY strict JSON. Do not include markdown.",
+    "Schema: {\"summary\":\"short Chinese status\",\"actions\":[{\"type\":\"click|type|select|wait|guard\",\"target\":\"element id\",\"value\":\"optional\",\"reason\":\"Chinese reason\"}]}",
+    "Rules: never submit, pay, send OTP, authorize, or delete; use guard before high-risk buttons.",
+    "The edge computer-use executor will perform only the returned safe actions on a simulated phone UI.",
+    `Scenario: ${payload?.scenario || "unknown"}`,
+    `Observation: ${JSON.stringify(payload?.observation || {}, null, 2)}`,
+    `Recommended fallback actions: ${JSON.stringify(fallback.actions, null, 2)}`,
+  ].join("\n\n");
+}
+
+function extractPlannerText(raw) {
+  try {
+    const json = JSON.parse(raw);
+    if (Array.isArray(json.output)) {
+      return json.output
+        .flatMap((item) => Array.isArray(item.content) ? item.content : [])
+        .map((part) => part.text || "")
+        .filter(Boolean)
+        .join("\n");
+    }
+    if (typeof json.output_text === "string") return json.output_text;
+    if (typeof json.text === "string") return json.text;
+  } catch {
+    return raw;
+  }
+  return raw;
+}
+
+function normalizePlan(text, fallback) {
+  const parsed = parseJsonObject(text);
+  if (!parsed || !Array.isArray(parsed.actions)) {
+    return {
+      ...fallback,
+      source: "cloud-planner",
+      note: "Planner returned narrative text; safe action policy used.",
+      cloudSummary: text.slice(0, 220),
+    };
+  }
+  const safeActions = parsed.actions
+    .map((action) => ({
+      type: String(action.type || ""),
+      target: String(action.target || ""),
+      value: action.value == null ? "" : String(action.value),
+      reason: String(action.reason || "planner action"),
+    }))
+    .filter((action) => isSafeAction(action));
+  return {
+    ok: true,
+    source: "cloud-planner",
+    summary: String(parsed.summary || fallback.summary),
+    actions: safeActions.length > 0 ? safeActions : fallback.actions,
+    note: "Cloud planner produced safe GUI actions.",
+  };
+}
+
+function parseJsonObject(text) {
+  const trimmed = String(text || "").trim();
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    const start = trimmed.indexOf("{");
+    const end = trimmed.lastIndexOf("}");
+    if (start >= 0 && end > start) {
+      try {
+        return JSON.parse(trimmed.slice(start, end + 1));
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  }
+}
+
+function fallbackPlan(payload) {
+  if (payload?.scenario === "trigger-health") {
+    return {
+      ok: true,
+      source: "edge-policy",
+      summary: "本地端侧策略推荐消化内科，并停在确认挂号前。",
+      actions: [
+        { type: "click", target: "ask-button", reason: "用户触发后先做端侧问询" },
+        { type: "click", target: "answer-button", reason: "演示回答：两天，轻微恶心，无胸痛" },
+        { type: "select", target: "hospital", value: "北京协和医院", reason: "北京固定候选医院中优先选择协和" },
+        { type: "select", target: "department", value: "消化内科", reason: "胃部不适匹配消化内科" },
+        { type: "select", target: "date", value: "明天上午", reason: "选择较近的可用时段" },
+        { type: "type", target: "materials", value: "身份证、医保卡、既往病历", reason: "提醒准备材料" },
+        { type: "guard", target: "confirm-button", reason: "确认挂号、支付、验证码必须由用户确认" },
+      ],
+    };
+  }
+  return {
+    ok: true,
+    source: "edge-policy",
+    summary: "端侧 Computer-Use 策略识别报名表，并停在提交前。",
+    actions: [
+      { type: "type", target: "name", value: "李桂兰", reason: "填写本地记忆中的姓名" },
+      { type: "type", target: "age", value: "70s", reason: "填写年龄段" },
+      { type: "type", target: "phone", value: "138****2675", reason: "只填写脱敏手机号" },
+      { type: "type", target: "area", value: "北京市朝阳区望京街道", reason: "填写居住区域" },
+      { type: "type", target: "contact", value: "女儿 王敏", reason: "填写紧急联系人" },
+      { type: "select", target: "course", value: "智能手机基础课", reason: "选择偏好课程" },
+      { type: "guard", target: "submit-button", reason: "提交报名属于高风险动作，必须停住" },
+    ],
+  };
+}
+
+function isSafeAction(action) {
+  const allowedTypes = new Set(["click", "type", "select", "wait", "guard"]);
+  if (!allowedTypes.has(action.type)) return false;
+  const highRiskTargets = ["submit", "confirm", "payment", "otp", "delete", "authorize"];
+  const target = action.target.toLowerCase();
+  if (action.type !== "guard" && highRiskTargets.some((item) => target.includes(item))) {
+    return false;
+  }
+  return true;
+}
+
+async function serveFile(res, filePath) {
+  const ext = path.extname(filePath).toLowerCase();
+  const types = {
+    ".html": "text/html; charset=utf-8",
+    ".css": "text/css; charset=utf-8",
+    ".js": "text/javascript; charset=utf-8",
+    ".json": "application/json; charset=utf-8",
+    ".svg": "image/svg+xml",
+  };
+  try {
+    const content = await fs.readFile(filePath);
+    res.writeHead(200, { "Content-Type": types[ext] || "application/octet-stream" });
+    res.end(content);
+  } catch {
+    res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
+    res.end("Not found");
+  }
+}
+
+function safeJoin(base, requestPath) {
+  const clean = decodeURIComponent(requestPath).replace(/^[/\\]+/, "");
+  const target = path.resolve(base, clean);
+  if (!target.startsWith(base)) {
+    throw new Error("Invalid path");
+  }
+  return target;
+}
+
+function sendJson(res, data, status = 200) {
+  res.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
+  res.end(JSON.stringify(data));
+}
+
+async function readJson(req) {
+  const chunks = [];
+  for await (const chunk of req) chunks.push(chunk);
+  const text = Buffer.concat(chunks).toString("utf8");
+  return text ? JSON.parse(text) : {};
+}
+
+function openBrowser(url) {
+  const command = process.platform === "win32" ? "powershell.exe" : process.platform === "darwin" ? "open" : "xdg-open";
+  const args = process.platform === "win32"
+    ? ["-NoProfile", "-Command", `Start-Process '${url}'`]
+    : [url];
+  const child = spawn(command, args, { detached: true, stdio: "ignore" });
+  child.unref();
+}

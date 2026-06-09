@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>老白 Agent - Always-on 自动填表</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="page">
+      <section class="phone" aria-label="模拟手机">
+        <div class="screen">
+          <div class="status-bar">
+            <span>09:41</span>
+            <span>5G 88%</span>
+          </div>
+          <div class="app-header">
+            <h2 class="app-title">社区智慧课堂</h2>
+            <p class="app-subtitle">北京市朝阳区 · 老年数字服务</p>
+          </div>
+          <div class="screen-wrap">
+            <div class="app-content">
+              <div class="notice">
+                页面识别：北京市朝阳区社区智慧课堂报名表。老白可帮您填写常用信息，提交前会停住。
+              </div>
+
+              <div class="field">
+                <label for="name">姓名</label>
+                <input id="name" autocomplete="off" />
+              </div>
+              <div class="field">
+                <label for="age">年龄段</label>
+                <input id="age" autocomplete="off" />
+              </div>
+              <div class="field">
+                <label for="phone">手机号</label>
+                <input id="phone" autocomplete="off" />
+              </div>
+              <div class="field">
+                <label for="area">居住区域</label>
+                <input id="area" autocomplete="off" />
+              </div>
+              <div class="field">
+                <label for="contact">紧急联系人</label>
+                <input id="contact" autocomplete="off" />
+              </div>
+              <div class="field">
+                <label for="course">报名课程</label>
+                <select id="course">
+                  <option value="">请选择</option>
+                  <option>智能手机基础课</option>
+                  <option>防诈骗安全课</option>
+                  <option>线上挂号与缴费课</option>
+                </select>
+              </div>
+
+              <button id="submit-button" class="danger-btn">提交报名</button>
+              <div class="notice danger">
+                安全策略：提交报名属于高风险动作，Agent 不会自动点击。
+              </div>
+            </div>
+            <div class="agent-toast" data-toast></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="operator">
+        <h1>Always-on 自动填表</h1>
+        <p>
+          这个页面模拟老人打开报名表后，端侧 Computer-Use 策略主动识别页面，并请求云侧 30B planner 生成安全动作序列。执行器会真实操作左侧手机界面里的控件。
+        </p>
+        <div class="operator-panel">
+          <div class="model-row">
+            <div>
+              <strong data-edge-label>Edge Computer-Use Policy</strong>
+              <span>屏幕观察、控件定位、低风险输入执行。</span>
+            </div>
+            <div class="pill">on-device</div>
+          </div>
+          <div class="model-row">
+            <div>
+              <strong data-planner-label>Cloud 30B Planner</strong>
+              <span>接收脱敏页面摘要，返回 JSON action plan。</span>
+            </div>
+            <div class="pill" data-planner-badge>checking</div>
+          </div>
+          <div class="controls">
+            <button class="primary-btn" data-start>启动 Agent</button>
+            <button class="secondary-btn" data-reset>重置页面</button>
+            <a class="secondary-btn" href="./trigger-health.html" style="text-decoration:none; display:inline-grid; place-items:center;">切到挂号 Demo</a>
+          </div>
+          <div class="trace" data-trace></div>
+        </div>
+      </section>
+    </main>
+
+    <script type="module">
+      import { bootAgent } from "./agent.js";
+
+      bootAgent({
+        scenario: "always-on-form",
+        observe() {
+          return {
+            device: "mobile-portrait-sim",
+            pageTitle: "北京市朝阳区社区智慧课堂报名表",
+            visibleFields: ["姓名", "年龄段", "手机号", "居住区域", "紧急联系人", "报名课程"],
+            privacy: {
+              rawScreenUploaded: false,
+              redaction: "strict",
+              sensitiveFields: ["phone"],
+            },
+            goal: "填写常用报名信息，并停在提交报名前",
+          };
+        },
+      });
+    </script>
+  </body>
+</html>

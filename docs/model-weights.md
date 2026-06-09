@@ -1,22 +1,40 @@
-# 模型权重说明
+# 模型配置说明
 
-当前 APK 不内置 Gemma 主模型权重。
+当前 Web Demo 不把模型权重放进仓库。
 
 原因：
 
-- Gemma LiteRT / MediaPipe 端侧权重通常较大，不适合直接打进演示 APK。
-- 公开仓库不适合提交模型下载 token 或私有访问凭证。
-- 当前目标优先级是让两个 demo 在手机上稳定跑通并可录屏。
+- 端侧模型权重体积大，不适合直接提交 Git。
+- 云侧 planner Key 不能提交到公开仓库。
+- 路演演示更需要稳定的 GUI action 链路。
 
-当前版本已经包含：
+## 本地配置
 
-- Android AccessibilityService 手机 GUI 操作骨架。
-- 本地 workflow。
-- 本地 embedding demo asset：`app/src/main/assets/embedding_kb.json`。
-- 可选 Ark 云端 planner 调用。
+复制模板：
 
-后续接真实 Gemma 时建议分三步：
+```powershell
+Copy-Item config.example.json config.local.json
+```
 
-1. 把 Gemma LiteRT / MediaPipe 权重作为 GitHub Release 附件或手动导入文件提供，不提交到 Git。
-2. 在 App 内增加模型导入和状态检测，显示真实加载状态。
-3. 将 `HealthBookingWorkflow` 和 `AlwaysOnFormWorkflow` 中的固定策略替换为 Gemma planner / UI understanding 输出，同时保留 `SafetyGuard`。
+配置示例：
+
+```json
+{
+  "plannerEndpoint": "https://example.com/api/v3/responses",
+  "plannerModel": "cloud-planner-model",
+  "plannerApiKey": "your-local-key",
+  "publicPlannerLabel": "Cloud 30B Planner",
+  "publicEdgeLabel": "Edge Computer-Use Policy"
+}
+```
+
+`config.local.json` 已加入 `.gitignore`，不会提交。
+
+## 替换真实模型
+
+后续如果接入真实 Gemma/Gemini/Gemma 端侧能力：
+
+1. 保持前端 action schema 不变。
+2. 在 `tools/demo-server.mjs` 替换 planner endpoint。
+3. 将 fallback action 替换为模型输出校验后的 action。
+4. 保留高风险 action guard。

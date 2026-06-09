@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>老白 Agent - Trigger 看病挂号</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="page">
+      <section class="phone" aria-label="模拟手机">
+        <div class="screen">
+          <div class="status-bar">
+            <span>09:41</span>
+            <span>5G 88%</span>
+          </div>
+          <div class="app-header">
+            <h2 class="app-title">北京医院挂号</h2>
+            <p class="app-subtitle">Trigger：我胃不舒服，帮我挂号</p>
+          </div>
+          <div class="screen-wrap">
+            <div class="app-content">
+              <div class="notice">
+                用户触发后，老白先做健康问询，再规划医院/科室，最后停在确认挂号前。
+              </div>
+
+              <div class="field">
+                <label for="symptom">用户请求</label>
+                <textarea id="symptom">我胃不舒服，帮我挂号</textarea>
+              </div>
+
+              <button id="ask-button" class="primary-btn" type="button">开始问询</button>
+
+              <div id="question-card" class="notice" hidden>
+                您这个不舒服有多久了？有没有发热、呕吐、胸痛这些情况？
+              </div>
+              <button id="answer-button" class="secondary-btn" type="button" hidden>
+                回答：两天了，有点恶心，没有胸痛
+              </button>
+
+              <div class="field">
+                <label for="hospital">医院</label>
+                <select id="hospital">
+                  <option value="">请选择</option>
+                  <option>北京协和医院</option>
+                  <option>北京大学人民医院</option>
+                  <option>北京朝阳医院</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="department">科室</label>
+                <select id="department">
+                  <option value="">请选择</option>
+                  <option>消化内科</option>
+                  <option>呼吸内科</option>
+                  <option>神经内科</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="date">时间</label>
+                <select id="date">
+                  <option value="">请选择</option>
+                  <option>明天上午</option>
+                  <option>明天下午</option>
+                  <option>本周五上午</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="materials">准备材料</label>
+                <textarea id="materials"></textarea>
+              </div>
+
+              <button id="confirm-button" class="danger-btn">确认挂号 / 支付 / 验证码</button>
+              <div class="notice danger">
+                安全策略：挂号确认、支付和验证码必须由用户自己确认。
+              </div>
+            </div>
+            <div class="agent-toast" data-toast></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="operator">
+        <h1>Trigger 看病挂号</h1>
+        <p>
+          这个页面模拟用户主动求助。端侧策略完成问询和屏幕执行，云侧 30B planner 只接收脱敏症状摘要，返回下一步 GUI 动作。
+        </p>
+        <div class="operator-panel">
+          <div class="model-row">
+            <div>
+              <strong data-edge-label>Edge Computer-Use Policy</strong>
+              <span>问询、页面控制、风险守卫。</span>
+            </div>
+            <div class="pill">on-device</div>
+          </div>
+          <div class="model-row">
+            <div>
+              <strong data-planner-label>Cloud 30B Planner</strong>
+              <span>脱敏挂号规划，返回 JSON action plan。</span>
+            </div>
+            <div class="pill" data-planner-badge>checking</div>
+          </div>
+          <div class="controls">
+            <button class="primary-btn" data-start>启动 Agent</button>
+            <button class="secondary-btn" data-reset>重置页面</button>
+            <a class="secondary-btn" href="./always-on-form.html" style="text-decoration:none; display:inline-grid; place-items:center;">切到填表 Demo</a>
+          </div>
+          <div class="trace" data-trace></div>
+        </div>
+      </section>
+    </main>
+
+    <script type="module">
+      import { bootAgent } from "./agent.js";
+
+      document.getElementById("ask-button").addEventListener("click", () => {
+        document.getElementById("question-card").hidden = false;
+        document.getElementById("answer-button").hidden = false;
+      });
+
+      document.getElementById("answer-button").addEventListener("click", () => {
+        document.getElementById("question-card").textContent = "已记录：两天，轻微恶心，无胸痛。正在生成挂号计划。";
+      });
+
+      bootAgent({
+        scenario: "trigger-health",
+        observe() {
+          return {
+            device: "mobile-portrait-sim",
+            userRequest: document.getElementById("symptom").value,
+            symptomSummary: "胃不舒服，持续两天，轻微恶心，无胸痛",
+            visibleHospitals: ["北京协和医院", "北京大学人民医院", "北京朝阳医院"],
+            privacy: {
+              rawScreenUploaded: false,
+              redaction: "strict",
+              medicalDetail: "summary-only",
+            },
+            goal: "推荐挂号医院和科室，停在确认挂号/支付/验证码前",
+          };
+        },
+      });
+    </script>
+  </body>
+</html>

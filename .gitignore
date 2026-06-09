@@ -1,12 +1,17 @@
-.gradle/
-build/
-app/build/
-local.properties
-*.iml
 .idea/
-captures/
-*.jks
-*.keystore
+*.iml
+.DS_Store
+Thumbs.db
+
+# Local-only secrets and runtime config.
+.env
+config.local.json
+config.local.js
 secrets.properties
-gemma-models/
+
+# Temporary build/runtime output.
+build/
+dist/
 artifact-download/
+node_modules/
+*.log

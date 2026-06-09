@@ -5,6 +5,9 @@
   "edgeEndpoint": "https://your-edge-computer-use.example.com/api/v3/responses",
   "edgeModel": "",
   "edgeApiKey": "put-your-edge-key-here",
-  "publicPlannerLabel": "Gemini 4 30B Cloud Model",
+  "localGemmaEnabled": true,
+  "localGemmaModelPath": "models/gemma-4-E4B-it.litertlm",
+  "localGemmaPython": ".venv/Scripts/python.exe",
+  "publicPlannerLabel": "Gemma 4 30B Cloud Planner",
   "publicEdgeLabel": "Gemma 4B Computer-Use"
 }

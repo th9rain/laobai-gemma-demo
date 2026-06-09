@@ -20,7 +20,7 @@
 3. 点击 `启动 Agent`。
 4. 右侧展示：
    - Gemma 4B Computer-Use
-   - Gemini 4 30B Cloud Model
+   - Gemma 4 30B Cloud Planner
 5. Agent 自动填写：
    - 李桂兰
    - 70s
@@ -56,5 +56,5 @@
 ```
 
 ```text
-界面上看不到 Key、真实 endpoint 或底层服务。演示中只展示 Gemma 4B Computer-Use 和 Gemini 4 30B 云侧模型的协作。
+界面上看不到 Key、真实 endpoint 或底层服务。演示中只展示 Gemma 4B Computer-Use 和 Gemma 4 30B Cloud Planner 的协作。
 ```

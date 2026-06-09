@@ -8,6 +8,26 @@
 - planner Key 不能提交到公开仓库。
 - 路演演示更需要稳定的 GUI action 链路。
 
+## 下载本地 Gemma 权重
+
+```powershell
+.\tools\download-gemma-model.ps1
+```
+
+下载位置：
+
+```text
+models/gemma-4-E4B-it.litertlm
+```
+
+这个文件约 3.66GB，`models/` 已加入 `.gitignore`。
+
+安装 LiteRT-LM 本地运行环境：
+
+```powershell
+.\tools\setup-litert-lm.ps1
+```
+
 ## 本地配置
 
 复制模板：
@@ -26,7 +46,10 @@ Copy-Item config.example.json config.local.json
   "edgeEndpoint": "https://example.com/api/v3/responses",
   "edgeModel": "",
   "edgeApiKey": "your-local-key",
-  "publicPlannerLabel": "Gemini 4 30B Cloud Model",
+  "localGemmaEnabled": true,
+  "localGemmaModelPath": "models/gemma-4-E4B-it.litertlm",
+  "localGemmaPython": ".venv/Scripts/python.exe",
+  "publicPlannerLabel": "Gemma 4 30B Cloud Planner",
   "publicEdgeLabel": "Gemma 4B Computer-Use"
 }
 ```

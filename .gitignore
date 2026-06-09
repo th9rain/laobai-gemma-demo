@@ -13,5 +13,7 @@ secrets.properties
 build/
 dist/
 artifact-download/
+models/
+.venv/
 node_modules/
 *.log

@@ -1,13 +1,13 @@
 import http from "node:http";
 import fs from "node:fs/promises";
 import path from "node:path";
+import os from "node:os";
 import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, "..");
 const webDir = path.join(rootDir, "web");
-const port = Number(process.env.LAOBAI_DEMO_PORT || 4173);
 
 const args = new Map();
 for (let i = 2; i < process.argv.length; i += 1) {
@@ -16,6 +16,9 @@ for (let i = 2; i < process.argv.length; i += 1) {
     args.set(arg.slice(2), process.argv[i + 1]?.startsWith("--") ? true : process.argv[++i] ?? true);
   }
 }
+
+const host = String(args.get("host") || process.env.LAOBAI_DEMO_HOST || "localhost");
+const port = Number(args.get("port") || process.env.LAOBAI_DEMO_PORT || 4173);
 
 const demoMap = {
   "always-on": "/always-on-form.html?autostart=1",
@@ -55,9 +58,9 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(port, () => {
+server.listen(port, host, () => {
   const demo = String(args.get("demo") || "");
-  const target = `http://localhost:${port}${demoMap[demo] || "/"}`;
+  const target = `http://${host}:${port}${demoMap[demo] || "/"}`;
   console.log(`LaoBai web demo server running: ${target}`);
   if (args.get("no-open") !== true) {
     openBrowser(target);
@@ -72,9 +75,12 @@ async function loadConfig() {
     edgeEndpoint: process.env.LAOBAI_EDGE_ENDPOINT || "",
     edgeModel: process.env.LAOBAI_EDGE_MODEL || "",
     edgeApiKey: process.env.LAOBAI_EDGE_API_KEY || "",
+    localGemmaEnabled: process.env.LAOBAI_LOCAL_GEMMA_ENABLED === "1",
+    localGemmaModelPath: process.env.LAOBAI_LOCAL_GEMMA_MODEL_PATH || "models/gemma-4-E4B-it.litertlm",
+    localGemmaPython: process.env.LAOBAI_LOCAL_GEMMA_PYTHON || ".venv/Scripts/python.exe",
   };
   const publicLabels = {
-    publicPlannerLabel: process.env.LAOBAI_PUBLIC_PLANNER_LABEL || "Gemini 4 30B Cloud Model",
+    publicPlannerLabel: process.env.LAOBAI_PUBLIC_PLANNER_LABEL || "Gemma 4 30B Cloud Planner",
     publicEdgeLabel: process.env.LAOBAI_PUBLIC_EDGE_LABEL || "Gemma 4B Computer-Use",
   };
   const localPath = path.join(rootDir, "config.local.json");
@@ -142,6 +148,13 @@ async function cloudPlannerRequest(payload, fallback) {
 }
 
 async function edgeComputerUseRequest(payload, cloudPlan) {
+  if (config.localGemmaEnabled) {
+    const localPlan = await localGemmaComputerUseRequest(payload, cloudPlan);
+    if (localPlan.source === "local-gemma-computer-use") {
+      return localPlan;
+    }
+  }
+
   if (!config.edgeApiKey || !config.edgeEndpoint || !config.edgeModel) {
     return withRuntime({
       ...cloudPlan,
@@ -169,6 +182,111 @@ async function edgeComputerUseRequest(payload, cloudPlan) {
     edgeConfigured: true,
     edgeHandoff: plan.source === "edge-computer-use",
     edgeStatus: plan.source === "edge-computer-use" ? "handoff-ok" : "safe-fallback",
+  });
+}
+
+async function localGemmaComputerUseRequest(payload, cloudPlan) {
+  const modelPath = path.resolve(rootDir, config.localGemmaModelPath || "");
+  const pythonPath = path.resolve(rootDir, config.localGemmaPython || "");
+  try {
+    await fs.access(modelPath);
+    await fs.access(pythonPath);
+  } catch {
+    return withRuntime({
+      ...cloudPlan,
+      note: "Local Gemma model or Python runner is not ready.",
+    }, {
+      localGemmaConfigured: true,
+      localGemmaHandoff: false,
+      localGemmaStatus: "not-ready",
+    });
+  }
+
+  const prompt = buildLocalGemmaPrompt(payload, cloudPlan);
+  const promptPath = path.join(os.tmpdir(), `laobai-gemma-prompt-${Date.now()}-${Math.random().toString(16).slice(2)}.txt`);
+  await fs.writeFile(promptPath, prompt, "utf8");
+  try {
+    const result = await runLocalGemmaProcess({
+      pythonPath,
+      modelPath,
+      promptPath,
+      timeoutMs: Number(process.env.LAOBAI_LOCAL_GEMMA_TIMEOUT_MS || 180000),
+    });
+    if (!result.ok || !result.plan) {
+      return withRuntime({
+        ...cloudPlan,
+        note: "Local Gemma returned non-JSON output; safe action policy used.",
+      }, {
+        localGemmaConfigured: true,
+        localGemmaHandoff: false,
+        localGemmaStatus: "non-json",
+      });
+    }
+    const normalized = normalizePlan(JSON.stringify(result.plan), cloudPlan, "local-gemma-computer-use");
+    return withRuntime(normalized, {
+      localGemmaConfigured: true,
+      localGemmaHandoff: true,
+      localGemmaStatus: "handoff-ok",
+      edgeConfigured: true,
+      edgeHandoff: true,
+      edgeStatus: "local-gemma-handoff",
+    });
+  } catch (error) {
+    debugModelCall("local-gemma-computer-use", {
+      errorName: String(error?.name || "Error"),
+      errorMessage: sanitizeDebugMessage(error?.message || error),
+    });
+    return withRuntime({
+      ...cloudPlan,
+      note: "Local Gemma handoff failed; safe action policy used.",
+    }, {
+      localGemmaConfigured: true,
+      localGemmaHandoff: false,
+      localGemmaStatus: "failed",
+    });
+  } finally {
+    fs.unlink(promptPath).catch(() => {});
+  }
+}
+
+function runLocalGemmaProcess({ pythonPath, modelPath, promptPath, timeoutMs }) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(pythonPath, [
+      path.join(rootDir, "tools", "local-gemma-runner.py"),
+      "--model", modelPath,
+      "--prompt-file", promptPath,
+    ], {
+      cwd: rootDir,
+      windowsHide: true,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    const timer = setTimeout(() => {
+      child.kill();
+      reject(new Error("Local Gemma runner timed out"));
+    }, timeoutMs);
+    const stdout = [];
+    const stderr = [];
+    child.stdout.on("data", (chunk) => stdout.push(chunk));
+    child.stderr.on("data", (chunk) => stderr.push(chunk));
+    child.on("error", (error) => {
+      clearTimeout(timer);
+      reject(error);
+    });
+    child.on("close", (code) => {
+      clearTimeout(timer);
+      const text = Buffer.concat(stdout).toString("utf8").trim();
+      const err = Buffer.concat(stderr).toString("utf8").trim();
+      try {
+        const parsed = JSON.parse(text || "{}");
+        if (code === 0 && parsed.ok) {
+          resolve(parsed);
+          return;
+        }
+        reject(new Error(parsed.error || parsed.text || err || `Local Gemma exited with ${code}`));
+      } catch {
+        reject(new Error(err || text || `Local Gemma exited with ${code}`));
+      }
+    });
   });
 }
 
@@ -268,6 +386,18 @@ function buildEdgePrompt(payload, plan) {
   ].join("\n\n");
 }
 
+function buildLocalGemmaPrompt(payload, plan) {
+  return [
+    "You are Gemma 4B Computer-Use running locally on device.",
+    "Return ONLY strict JSON. Do not include markdown.",
+    "Schema: {\"summary\":\"short Chinese status\",\"actions\":[{\"type\":\"click|type|select|wait|guard\",\"target\":\"element id\",\"value\":\"optional\",\"reason\":\"Chinese reason\"}]}",
+    "You control a simulated mobile phone HTML UI. Validate and return the safe GUI action list below using the same element ids.",
+    "Never click submit, confirm, payment, OTP, authorize, or delete targets. Use guard for those.",
+    `Scenario: ${payload?.scenario || "unknown"}`,
+    `Candidate actions: ${JSON.stringify(plan.actions || [], null, 2)}`,
+  ].join("\n\n");
+}
+
 function extractPlannerText(raw) {
   try {
     const json = JSON.parse(raw);
@@ -308,7 +438,7 @@ function normalizePlan(text, fallback, source) {
   return {
     ok: true,
     source,
-    summary: String(parsed.summary || fallback.summary),
+    summary: readableModelText(parsed.summary) ? String(parsed.summary) : fallback.summary,
     actions: completedActions,
     note: "Model adapter produced safe GUI actions.",
     runtime: fallback.runtime || {},
@@ -317,22 +447,16 @@ function normalizePlan(text, fallback, source) {
 
 function completeDemoActions(modelActions, fallbackActions) {
   if (!Array.isArray(modelActions) || modelActions.length === 0) return fallbackActions;
-  const extras = [];
-  const completed = fallbackActions.map((fallbackAction) => {
+  return fallbackActions.map((fallbackAction) => {
     const modelAction = modelActions.find((action) => sameActionSlot(action, fallbackAction));
     if (!modelAction || actionNeedsFallback(modelAction)) return fallbackAction;
     return {
       ...fallbackAction,
-      ...modelAction,
-      reason: modelAction.reason || fallbackAction.reason,
+      type: modelAction.type,
+      target: modelAction.target,
+      reason: readableModelText(modelAction.reason) ? modelAction.reason : fallbackAction.reason,
     };
   });
-  for (const action of modelActions) {
-    if (!fallbackActions.some((fallbackAction) => sameActionSlot(action, fallbackAction))) {
-      extras.push(action);
-    }
-  }
-  return [...completed.slice(0, -1), ...extras, completed[completed.length - 1]].filter(Boolean);
 }
 
 function sameActionSlot(action, fallbackAction) {
@@ -341,6 +465,11 @@ function sameActionSlot(action, fallbackAction) {
 
 function actionNeedsFallback(action) {
   return (action.type === "type" || action.type === "select") && !String(action.value || "").trim();
+}
+
+function readableModelText(value) {
+  const text = String(value || "").trim();
+  return Boolean(text) && !text.includes("\uFFFD");
 }
 
 function withRuntime(plan, patch) {

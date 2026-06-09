@@ -4,7 +4,7 @@ window.bootAgent = async function bootAgent(options) {
   const state = {
     running: false,
     step: 0,
-    config: { plannerLabel: "Gemini 4 30B Cloud Model", edgeLabel: "Gemma 4B Computer-Use", plannerOnline: false },
+    config: { plannerLabel: "Gemma 4 30B Cloud Planner", edgeLabel: "Gemma 4B Computer-Use", plannerOnline: false },
   };
 
   const trace = document.querySelector("[data-trace]");
@@ -119,7 +119,7 @@ async function requestPlan(scenario, observation) {
 async function loadPublicConfig() {
   if (window.location.protocol === "file:") {
     return {
-      plannerLabel: "Gemini 4 30B Cloud Model",
+      plannerLabel: "Gemma 4 30B Cloud Planner",
       edgeLabel: "Gemma 4B Computer-Use",
       plannerOnline: false,
     };
@@ -192,12 +192,14 @@ function runtimePrivacyText(runtime = {}) {
 }
 
 function runtimePlannerText(runtime = {}) {
-  if (runtime.plannerHandoff) return "Gemini 4 30B 云侧模型已返回安全 JSON action plan。";
-  if (runtime.plannerConfigured) return "Gemini 4 30B 云侧模型已配置，但本轮使用安全 fallback。";
-  return "Gemini 4 30B 云侧模型未启用，本轮使用本地安全策略。";
+  if (runtime.plannerHandoff) return "Gemma 4 30B 云侧 Planner 已返回安全 JSON action plan。";
+  if (runtime.plannerConfigured) return "Gemma 4 30B 云侧 Planner 已配置，但本轮使用安全 fallback。";
+  return "Gemma 4 30B 云侧 Planner 未启用，本轮使用本地安全策略。";
 }
 
 function runtimeEdgeText(runtime = {}) {
+  if (runtime.localGemmaHandoff) return "本地 Gemma 4B/E4B LiteRT 模型已生成 GUI action。";
+  if (runtime.localGemmaConfigured && !runtime.localGemmaHandoff) return "本地 Gemma 已配置，但本轮使用安全 fallback 或远端 adapter。";
   if (runtime.edgeHandoff) return "Gemma 4B Computer-Use adapter 已生成 GUI action。";
   if (runtime.edgeConfigured) return "Gemma 4B Computer-Use adapter 已配置，但本轮使用浏览器执行器。";
   return "浏览器执行器按安全 action schema 操作模拟手机控件。";

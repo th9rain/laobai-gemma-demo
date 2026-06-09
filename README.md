@@ -37,14 +37,31 @@ Copy-Item config.example.json config.local.json
 ```
 
 然后在 `config.local.json` 中填写私有 planner endpoint、model 和 key。这个文件被 `.gitignore` 忽略，不会提交到 GitHub。
-如果没有单独的端侧 Computer-Use adapter，可以让 `edgeModel` 留空；server 会复用私有 planner adapter 做第二段 Computer-Use action 转换，失败时才使用浏览器执行器按安全 action schema 操作模拟手机控件。
+如果要启用本地 Gemma Computer-Use，先下载权重并安装 LiteRT-LM：
+
+```powershell
+.\tools\download-gemma-model.ps1
+.\tools\setup-litert-lm.ps1
+```
+
+然后在 `config.local.json` 中保留：
+
+```json
+{
+  "localGemmaEnabled": true,
+  "localGemmaModelPath": "models/gemma-4-E4B-it.litertlm",
+  "localGemmaPython": ".venv/Scripts/python.exe"
+}
+```
+
+如果没有单独的端侧 Computer-Use adapter，server 会优先调用本地 Gemma LiteRT 模型做第二段 Computer-Use action 转换；失败时才复用私有 planner adapter 或浏览器执行器。
 
 页面只显示：
 
 - `Gemma 4B Computer-Use`
-- `Gemini 4 30B Cloud Model`
+- `Gemma 4 30B Cloud Planner`
 
-实际请求由 `tools/demo-server.mjs` 的 `/api/plan` 代理完成。浏览器前端只能看到 `/api/plan`，看不到真实 Key、真实 endpoint、真实 model 或底层服务。server 会先请求私有 planner adapter，再把规划交给 Computer-Use adapter 生成最终 GUI action；如果 adapter 不可用，才退回浏览器执行器。
+实际请求由 `tools/demo-server.mjs` 的 `/api/plan` 代理完成。浏览器前端只能看到 `/api/plan`，看不到真实 Key、真实 endpoint、真实 model 或底层服务。server 会先请求私有 planner adapter，再把规划交给本地 Gemma / Computer-Use adapter 生成最终 GUI action；如果 adapter 不可用，才退回浏览器执行器。
 
 如果没有配置 Key，demo 会自动使用本地安全 fallback action，保证演示可运行。
 

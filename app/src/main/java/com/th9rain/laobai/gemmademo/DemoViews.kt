@@ -67,7 +67,7 @@ fun Context.demoInput(label: String, id: Int): EditText {
         hint = label
         contentDescription = label
         textSize = 17f
-        singleLine = true
+        setSingleLine(true)
         inputType = InputType.TYPE_CLASS_TEXT
         setSelectAllOnFocus(false)
         layoutParams = LinearLayout.LayoutParams(

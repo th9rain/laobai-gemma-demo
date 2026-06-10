@@ -79,7 +79,7 @@
       <section class="operator">
         <h1>Always-on 自动填表</h1>
         <p>
-          这个页面模拟老人打开报名表后，端侧 Gemma 4B Computer-Use 主动识别页面，本地固定 workflow 生成安全动作序列。执行器会真实操作左侧手机界面里的控件。
+          这个页面模拟老人打开报名表后，端侧 Gemma 4B/E4B LiteRT 权重根据当前页面 observation 生成 GUI action。执行器会按模型输出真实操作左侧手机界面里的控件。
         </p>
         <div class="operator-panel">
           <div class="model-row">
@@ -91,15 +91,15 @@
           </div>
           <div class="model-row">
             <div>
-              <strong data-planner-label>本地固定 Workflow</strong>
-              <span>端侧 Gemma 校验固定填表动作，不请求云端 Planner。</span>
+              <strong data-planner-label>真实本地 Gemma 权重</strong>
+              <span>Always-on 不请求云端 Planner；缺少本地权重或模型调用失败时直接停止。</span>
             </div>
             <div class="pill" data-planner-badge>checking</div>
           </div>
           <div class="controls">
             <button class="primary-btn" data-start>启动 Agent</button>
             <button class="secondary-btn" data-reset>重置页面</button>
-            <a class="secondary-btn" href="./trigger-health.html" style="text-decoration:none; display:inline-grid; place-items:center;">切到挂号 Demo</a>
+            <a class="secondary-btn" href="./trigger-health.html" style="text-decoration:none; display:inline-grid; place-items:center;">切到 Trigger 挂号</a>
           </div>
           <div class="trace" data-trace></div>
           <div class="model-io" data-model-io></div>

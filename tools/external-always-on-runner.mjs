@@ -85,11 +85,21 @@ async function requestPlan(observation) {
 async function executeAction(action) {
   const selector = `#${cssEscape(action.target)}`;
   if (action.type === "type") {
-    await page.locator(selector).fill(action.value || "");
+    const tagName = await page.locator(selector).evaluate((element) => element.tagName.toLowerCase());
+    if (tagName === "select") {
+      await page.locator(selector).selectOption({ label: action.value || "" });
+    } else {
+      await page.locator(selector).fill(action.value || "");
+    }
     return;
   }
   if (action.type === "select") {
-    await page.locator(selector).selectOption({ label: action.value || "" });
+    const tagName = await page.locator(selector).evaluate((element) => element.tagName.toLowerCase());
+    if (tagName === "select") {
+      await page.locator(selector).selectOption({ label: action.value || "" });
+    } else {
+      await page.locator(selector).fill(action.value || "");
+    }
     return;
   }
   if (action.type === "click") {

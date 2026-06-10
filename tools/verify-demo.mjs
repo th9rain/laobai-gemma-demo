@@ -22,6 +22,9 @@ async function main() {
       LAOBAI_PLANNER_API_KEY: "",
       LAOBAI_EDGE_ENDPOINT: "",
       LAOBAI_EDGE_API_KEY: "",
+      LAOBAI_LOCAL_GEMMA_ENABLED: "1",
+      LAOBAI_LOCAL_GEMMA_MODEL_PATH: "models/gemma-4-E4B-it.litertlm",
+      LAOBAI_LOCAL_GEMMA_PYTHON: ".venv/Scripts/python.exe",
       LAOBAI_PUBLIC_PLANNER_LABEL: "Gemma 4 30B Cloud Planner",
       LAOBAI_PUBLIC_EDGE_LABEL: "Gemma 4B Computer-Use",
     },
@@ -47,6 +50,9 @@ async function main() {
     assert(form.runtime?.modelNameVisibleToBrowser === false, "form runtime exposes model state incorrectly");
     assert(form.runtime?.plannerSkipped === true, "always-on should not call cloud planner");
     assert(form.runtime?.workflowMode === "always-on-local-only", "always-on should use local workflow mode");
+    assert(form.source === "always-on-real-local-gemma", "always-on should use real local Gemma");
+    assert(form.runtime?.localGemmaHandoff === true, "always-on should hand off to local Gemma");
+    assertModelCall(form, 1);
     assertAction(form, "type", "name");
     assertAction(form, "click", "next-button");
 
@@ -59,6 +65,9 @@ async function main() {
       },
     });
     assert(formPage2.runtime?.plannerSkipped === true, "always-on page 2 should not call cloud planner");
+    assert(formPage2.source === "always-on-real-local-gemma", "always-on page 2 should use real local Gemma");
+    assert(formPage2.runtime?.localGemmaHandoff === true, "always-on page 2 should hand off to local Gemma");
+    assertModelCall(formPage2, 2);
     assertAction(formPage2, "select", "course");
     assertAction(formPage2, "type", "learning-goal");
     assertAction(formPage2, "guard", "submit-button");
@@ -106,6 +115,20 @@ function getFreePort() {
 function assertAction(plan, type, target) {
   const ok = Array.isArray(plan.actions) && plan.actions.some((action) => action.type === type && action.target === target);
   assert(ok, `missing action ${type}:${target}`);
+}
+
+function assertModelCall(plan, page) {
+  assert(Array.isArray(plan.modelCalls) && plan.modelCalls.length === 1, `page ${page} missing model call`);
+  const call = plan.modelCalls[0];
+  assert(String(call.title || "").includes("真实本地 Gemma"), `page ${page} model title is not real Gemma`);
+  assert(String(call.input || "").includes(`Current page number: ${page}`), `page ${page} model input missing page marker`);
+  assert(String(call.input || "").includes("北京市朝阳区社区智慧课堂报名表"), `page ${page} model input missing observation`);
+  assert(String(call.output || "").includes("actions"), `page ${page} model output missing actions`);
+  assert(!hasMojibake(`${call.input}\n${call.output}`), `page ${page} model IO contains mojibake`);
+}
+
+function hasMojibake(text) {
+  return /�|鑰|濉|绔|鍖|涓|缁|妯|璇|鐢/.test(String(text || ""));
 }
 
 function assert(condition, message) {

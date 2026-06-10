@@ -3,7 +3,7 @@
 ## 准备
 
 1. 确认本地 Gemma 权重和 LiteRT-LM 环境已准备好。
-2. 只录 Always-on 离线 demo 时运行：
+2. 只录 Always-on 真实本地 Gemma 权重版本时运行：
 
 ```powershell
 .\run-always-on-demo.ps1
@@ -27,7 +27,7 @@ npx playwright install chromium
 
 5. 浏览器打开首页后开始录屏。
 
-如果现场网络或本地模型服务不可用，可以直接打开 `web/always-on-form.html` 和 `web/trigger-health.html`，页面会使用内置安全 action 序列保证演示连续。
+Always-on 必须通过本地 server 调用真实 Gemma 权重，不能直接双击 HTML 文件运行。Trigger 页面在没有云端配置时仍保留本地安全 fallback。
 
 ## Demo 1：Always-on 自动填表
 
@@ -36,7 +36,7 @@ npx playwright install chromium
 3. 点击 `启动 Agent`。
 4. 右侧展示：
    - Gemma 4B Computer-Use
-   - 本地固定 Workflow
+   - 真实本地 Gemma 权重
 5. 右侧展开 `模型输入 Prompt` 和 `模型原始输出`。内容来自 `tools/always-on-workflow.py` 对本地 Gemma LiteRT 权重的实际调用。
 6. 第一次本地 Gemma 调用后，Agent 自动填写第一页：
    - 李桂兰
@@ -51,8 +51,8 @@ npx playwright install chromium
    - 想学会微信视频、线上挂号和识别诈骗短信。
 10. Agent 停在 `提交报名` 前。
 
-讲解重点：Always-on 不是连续录屏，而是页面状态触发；端侧执行低风险动作，提交前停住。
-Always-on 不请求云端 Planner，本轮只展示本地固定 Workflow 和端侧 Gemma。两页表单会触发两次本地模型调用，右侧能看到每次模型的输入和输出。
+讲解重点：Always-on 不是连续录屏，而是页面状态触发；端侧 Gemma 权重生成低风险 GUI action，提交前停住。
+Always-on 不请求云端 Planner，也不使用静态 fallback。两页表单会触发两次本地模型调用，右侧能看到每次模型的输入和输出。
 
 ## Demo 2：Trigger 看病挂号
 
@@ -78,5 +78,5 @@ Always-on 不请求云端 Planner，本轮只展示本地固定 Workflow 和端�
 ```
 
 ```text
-界面上看不到 Key、真实 endpoint 或底层服务。Always-on 展示本地 Workflow + Gemma 4B Computer-Use；Trigger 展示 Gemma 4B Computer-Use 和 Gemma 4 30B Cloud Planner 的协作。
+界面上看不到 Key、真实 endpoint 或底层服务。Always-on 展示真实本地 Gemma 权重生成 GUI action；Trigger 展示 Gemma 4B Computer-Use 和 Gemma 4 30B Cloud Planner 的协作。
 ```

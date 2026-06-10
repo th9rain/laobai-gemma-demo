@@ -1,4 +1,4 @@
-import http from "node:http";
+﻿import http from "node:http";
 import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
@@ -112,23 +112,15 @@ function effectiveEdgeModel(configData) {
 async function plannerRequest(payload) {
   const fallback = fallbackPlan(payload);
   if (payload?.scenario === "always-on-form") {
-    return alwaysOnLocalWorkflowRequest(payload, fallback);
+    return alwaysOnLocalWorkflowRequest(payload);
   }
   const cloudPlan = await cloudPlannerRequest(payload, fallback);
   return edgeComputerUseRequest(payload, cloudPlan);
 }
 
-async function alwaysOnLocalWorkflowRequest(payload, fallback) {
+async function alwaysOnLocalWorkflowRequest(payload) {
   if (!config.localGemmaEnabled) {
-    return withRuntime({
-      ...fallback,
-      source: "always-on-local-workflow",
-      note: "Always-on uses deterministic local workflow; cloud planner is not called.",
-    }, alwaysOnRuntimePatch({
-      localGemmaConfigured: false,
-      localGemmaHandoff: false,
-      localGemmaStatus: "disabled",
-    }));
+    throw new Error("Always-on requires LAOBAI_LOCAL_GEMMA_ENABLED=1. Static fallback is disabled.");
   }
 
   const modelPath = path.resolve(rootDir, config.localGemmaModelPath || "");
@@ -136,16 +128,8 @@ async function alwaysOnLocalWorkflowRequest(payload, fallback) {
   try {
     await fs.access(modelPath);
     await fs.access(pythonPath);
-  } catch {
-    return withRuntime({
-      ...fallback,
-      source: "always-on-local-workflow",
-      note: "Always-on local Gemma is not ready; deterministic local workflow used.",
-    }, alwaysOnRuntimePatch({
-      localGemmaConfigured: true,
-      localGemmaHandoff: false,
-      localGemmaStatus: "not-ready",
-    }));
+  } catch (error) {
+    throw new Error(`Always-on real Gemma dependency missing: ${error?.message || error}`);
   }
 
   const observationPath = path.join(os.tmpdir(), `laobai-always-on-observation-${Date.now()}-${Math.random().toString(16).slice(2)}.json`);
@@ -158,29 +142,21 @@ async function alwaysOnLocalWorkflowRequest(payload, fallback) {
       timeoutMs: Number(process.env.LAOBAI_LOCAL_GEMMA_TIMEOUT_MS || 180000),
     });
     if (!result.ok || !result.plan) {
-      return withRuntime({
-        ...fallback,
-        source: "always-on-local-workflow",
-        note: "Always-on Python workflow returned no plan; deterministic local workflow used.",
-      }, alwaysOnRuntimePatch({
-        localGemmaConfigured: true,
-        localGemmaHandoff: false,
-        localGemmaStatus: "workflow-empty",
-      }));
+      throw new Error("Always-on real Gemma workflow returned no action plan.");
     }
-    const normalized = normalizePlan(JSON.stringify(result.plan), fallback, "always-on-local-gemma-workflow");
+    const normalized = normalizeAlwaysOnPlan(result.plan);
     return withRuntime({
       ...normalized,
       modelCalls: [{
-        title: `Always-on 本地 Gemma 调用 / 第 ${payload?.observation?.currentPage || 1} 页`,
+        title: `Always-on 真实本地 Gemma 调用 / 第 ${payload?.observation?.currentPage || 1} 页`,
         input: result.modelInput || "",
         output: result.modelOutput || "",
       }],
-      note: "Always-on fixed workflow produced by local Gemma and parsed by Python.",
+      note: "Always-on action plan produced by the local Gemma LiteRT weight.",
     }, alwaysOnRuntimePatch({
       localGemmaConfigured: true,
       localGemmaHandoff: true,
-      localGemmaStatus: result.modelParsed ? "workflow-ok" : "workflow-fallback",
+      localGemmaStatus: result.modelParsed ? "workflow-ok" : "workflow-validated",
       localGemmaParsed: Boolean(result.modelParsed),
     }));
   } catch (error) {
@@ -188,18 +164,31 @@ async function alwaysOnLocalWorkflowRequest(payload, fallback) {
       errorName: String(error?.name || "Error"),
       errorMessage: sanitizeDebugMessage(error?.message || error),
     });
-    return withRuntime({
-      ...fallback,
-      source: "always-on-local-workflow",
-      note: "Always-on local Gemma workflow failed; deterministic local workflow used.",
-    }, alwaysOnRuntimePatch({
-      localGemmaConfigured: true,
-      localGemmaHandoff: false,
-      localGemmaStatus: "workflow-failed",
-    }));
+    throw error;
   } finally {
     fs.unlink(observationPath).catch(() => {});
   }
+}
+
+function normalizeAlwaysOnPlan(plan) {
+  const actions = Array.isArray(plan?.actions) ? plan.actions : [];
+  const safeActions = actions
+    .map((action) => ({
+      type: String(action.type || ""),
+      target: String(action.target || ""),
+      value: action.value == null ? "" : String(action.value),
+      reason: String(action.reason || "local Gemma action"),
+    }))
+    .filter((action) => isSafeAction(action));
+  if (safeActions.length === 0) {
+    throw new Error("Always-on real Gemma returned no safe actions.");
+  }
+  return {
+    ok: true,
+    source: "always-on-real-local-gemma",
+    summary: readableModelText(plan.summary) ? String(plan.summary) : "本地 Gemma 已生成 Always-on GUI 动作。",
+    actions: safeActions,
+  };
 }
 
 function alwaysOnRuntimePatch(extra = {}) {

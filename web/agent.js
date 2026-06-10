@@ -42,7 +42,12 @@ window.bootAgent = async function bootAgent(options) {
     showToast("老白正在观察当前手机页面。");
 
     if (options.scenario === "always-on-form") {
-      await runAlwaysOnWorkflow();
+      try {
+        await runAlwaysOnWorkflow();
+      } catch (error) {
+        addTrace("真实 Gemma 调用失败", String(error?.message || error), true);
+        showToast("本地 Gemma 权重调用失败，已停止。", true);
+      }
     } else {
       const observation = options.observe();
       const plan = await requestPlan(options.scenario, observation);
@@ -66,6 +71,9 @@ window.bootAgent = async function bootAgent(options) {
       const observation = options.observe();
       addTrace(`第 ${pass} 次观察`, `当前页面：第 ${observation.currentPage || pass} 页；可见字段：${(observation.visibleFields || []).join("、")}`);
       const plan = await requestPlan(options.scenario, observation);
+      if (!plan?.ok) {
+        throw new Error(plan?.error || "Always-on real Gemma plan request failed.");
+      }
       renderModelCalls(plan.modelCalls);
       addTrace("隐私防火墙", runtimePrivacyText(plan.runtime));
       addTrace(plannerTraceTitle(plan.runtime, options.scenario), runtimePlannerText(plan.runtime));
@@ -162,12 +170,15 @@ window.bootAgent = async function bootAgent(options) {
 
   function applyScenarioLabels() {
     if (options.scenario !== "always-on-form") return;
-    if (plannerLabel) plannerLabel.textContent = "本地固定 Workflow";
+    if (plannerLabel) plannerLabel.textContent = "真实本地 Gemma 权重";
   }
 };
 
 async function requestPlan(scenario, observation) {
   if (window.location.protocol === "file:") {
+    if (scenario === "always-on-form") {
+      throw new Error("Always-on 真实权重模式必须通过本地 server 运行，不能直接打开 HTML 文件。");
+    }
     return fallbackPlan(scenario, observation);
   }
   try {
@@ -177,10 +188,17 @@ async function requestPlan(scenario, observation) {
       body: JSON.stringify({ scenario, observation }),
     });
     if (!response.ok) {
+      if (scenario === "always-on-form") {
+        const text = await response.text();
+        throw new Error(text || `HTTP ${response.status}`);
+      }
       return fallbackPlan(scenario, observation);
     }
     return response.json();
-  } catch {
+  } catch (error) {
+    if (scenario === "always-on-form") {
+      throw error;
+    }
     return fallbackPlan(scenario, observation);
   }
 }
@@ -221,31 +239,12 @@ function fallbackPlan(scenario, observation = {}) {
     };
   }
   return {
-    ok: true,
-    source: "static-html-policy",
-    summary: "静态 HTML 模式：使用内置安全动作序列演示自动填表。",
+    ok: false,
+    source: "no-fallback",
+    error: `No frontend fallback is available for scenario: ${scenario}`,
     runtime: fallbackRuntime(),
-    actions: alwaysOnStaticActions(observation),
+    actions: [],
   };
-}
-
-function alwaysOnStaticActions(observation = {}) {
-  const page = Number(observation.currentPage || 1);
-  if (page === 2) {
-    return [
-      { type: "type", target: "area", value: "北京市朝阳区望京街道", reason: "填写居住区域" },
-      { type: "type", target: "contact", value: "女儿 王敏", reason: "填写紧急联系人" },
-      { type: "select", target: "course", value: "智能手机基础课", reason: "选择偏好课程" },
-      { type: "type", target: "learning-goal", value: "想学会微信视频、线上挂号和识别诈骗短信。", reason: "填写学习目标" },
-      { type: "guard", target: "submit-button", reason: "提交报名属于高风险动作，必须停住" },
-    ];
-  }
-  return [
-    { type: "type", target: "name", value: "李桂兰", reason: "填写本地记忆中的姓名" },
-    { type: "type", target: "age", value: "70s", reason: "填写年龄段" },
-    { type: "type", target: "phone", value: "138****2675", reason: "只填写脱敏手机号" },
-    { type: "click", target: "next-button", reason: "第一页填写完成，进入第二页继续观察" },
-  ];
 }
 
 function fallbackRuntime() {
@@ -265,7 +264,7 @@ function fallbackRuntime() {
 
 function startupTraceText(scenario) {
   if (scenario === "always-on-form") {
-    return "正在读取屏幕结构，准备运行端侧固定 workflow。";
+    return "正在读取屏幕结构，准备调用真实本地 Gemma 权重。";
   }
   return "正在读取屏幕结构，准备请求云侧 Planner。";
 }
@@ -284,15 +283,15 @@ function runtimePrivacyText(runtime = {}) {
 }
 
 function runtimePlannerText(runtime = {}) {
-  if (runtime.plannerSkipped) return "Always-on 固定 workflow 不请求云端 Planner，本轮完全本地处理。";
+  if (runtime.plannerSkipped) return "Always-on 不请求云端 Planner，本轮必须由真实本地 Gemma 权重返回动作。";
   if (runtime.plannerHandoff) return "Gemma 4 30B 云侧 Planner 已返回安全 JSON action plan。";
   if (runtime.plannerConfigured) return "Gemma 4 30B 云侧 Planner 已配置，但本轮使用安全 fallback。";
   return "Gemma 4 30B 云侧 Planner 未启用，本轮使用本地安全策略。";
 }
 
 function runtimeEdgeText(runtime = {}) {
-  if (runtime.workflowMode === "always-on-local-only" && runtime.localGemmaHandoff) return "本地 Gemma 4B/E4B LiteRT 模型已校验固定填表 workflow。";
-  if (runtime.workflowMode === "always-on-local-only") return "Always-on 使用本地固定 workflow，未调用云端。";
+  if (runtime.workflowMode === "always-on-local-only" && runtime.localGemmaHandoff) return "本地 Gemma 4B/E4B LiteRT 权重已生成并校验 GUI action。";
+  if (runtime.workflowMode === "always-on-local-only") return "Always-on 等待真实本地 Gemma 权重返回动作。";
   if (runtime.localGemmaHandoff) return "本地 Gemma 4B/E4B LiteRT 模型已生成 GUI action。";
   if (runtime.localGemmaConfigured && !runtime.localGemmaHandoff) return "本地 Gemma 已配置，但本轮使用安全 fallback 或远端 adapter。";
   if (runtime.edgeHandoff) return "Gemma 4B Computer-Use adapter 已生成 GUI action。";

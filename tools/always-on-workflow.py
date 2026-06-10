@@ -23,44 +23,20 @@ def load_local_gemma_runner():
 run_litert_lm = load_local_gemma_runner().run_litert_lm
 
 
-PAGE_WORKFLOWS = {
+PAGE_CONTRACTS = {
     1: {
-        "summary": "Always-on 本地 workflow 已识别第 1 页基础信息表单，准备填写并进入下一页。",
-        "actions": [
-            {"type": "type", "target": "name", "value": "李桂兰", "reason": "填写端侧本地记忆中的姓名"},
-            {"type": "type", "target": "age", "value": "70s", "reason": "填写端侧本地记忆中的年龄段"},
-            {"type": "type", "target": "phone", "value": "138****2675", "reason": "只填写脱敏手机号"},
-            {"type": "click", "target": "next-button", "value": "", "reason": "第一页低风险字段填写完成，进入第二页继续观察"},
-        ],
+        "required_targets": ["name", "age", "phone", "next-button"],
+        "allowed_targets": ["name", "age", "phone", "next-button"],
     },
     2: {
-        "summary": "Always-on 本地 workflow 已识别第 2 页课程信息，准备填写并停在提交前。",
-        "actions": [
-            {"type": "type", "target": "area", "value": "北京市朝阳区望京街道", "reason": "填写端侧本地记忆中的居住区域"},
-            {"type": "type", "target": "contact", "value": "女儿 王敏", "reason": "填写端侧本地记忆中的紧急联系人"},
-            {"type": "select", "target": "course", "value": "智能手机基础课", "reason": "选择端侧本地记忆中的偏好课程"},
-            {"type": "type", "target": "learning-goal", "value": "想学会微信视频、线上挂号和识别诈骗短信。", "reason": "填写更长的学习目标，展示模型处理多行文本输入"},
-            {"type": "guard", "target": "submit-button", "value": "", "reason": "提交报名属于高风险动作，必须停在提交前"},
-        ],
+        "required_targets": ["area", "contact", "course", "learning-goal", "submit-button"],
+        "allowed_targets": ["area", "contact", "course", "learning-goal", "submit-button"],
     },
-}
-
-FIXED_WORKFLOW = {
-    "summary": "Always-on 本地 workflow 已识别社区报名表，准备填写常用信息并停在提交前。",
-    "actions": [
-        {"type": "type", "target": "name", "value": "李桂兰", "reason": "填写端侧本地记忆中的姓名"},
-        {"type": "type", "target": "age", "value": "70s", "reason": "填写端侧本地记忆中的年龄段"},
-        {"type": "type", "target": "phone", "value": "138****2675", "reason": "只填写脱敏手机号"},
-        {"type": "type", "target": "area", "value": "北京市朝阳区望京街道", "reason": "填写端侧本地记忆中的居住区域"},
-        {"type": "type", "target": "contact", "value": "女儿 王敏", "reason": "填写端侧本地记忆中的紧急联系人"},
-        {"type": "select", "target": "course", "value": "智能手机基础课", "reason": "选择端侧本地记忆中的偏好课程"},
-        {"type": "type", "target": "learning-goal", "value": "想学会微信视频、线上挂号和识别诈骗短信。", "reason": "填写学习目标"},
-        {"type": "guard", "target": "submit-button", "value": "", "reason": "提交报名属于高风险动作，必须停在提交前"},
-    ],
 }
 
 ALLOWED_TYPES = {"click", "type", "select", "wait", "guard"}
 HIGH_RISK_TARGETS = ("submit", "confirm", "payment", "otp", "delete", "authorize")
+SELECT_TARGETS = {"course"}
 
 DEFAULT_OBSERVATION = {
     "device": "mobile-portrait-sim",
@@ -89,7 +65,9 @@ def main():
     text = run_litert_lm(args.model, prompt, args.max_tokens)
     model_plan = parse_json_object(text)
     model_parsed = isinstance(model_plan, dict) and isinstance(model_plan.get("actions"), list)
-    plan = merge_with_fixed_workflow(model_plan if model_parsed else {}, observation)
+    if not model_parsed:
+        raise ValueError("Gemma did not return valid JSON with an actions array.")
+    plan = validate_model_plan(model_plan, observation)
 
     print(json.dumps({
         "ok": True,
@@ -110,17 +88,23 @@ def read_observation(path):
 
 def build_prompt(observation):
     page = current_page(observation)
-    page_contract = PAGE_WORKFLOWS.get(page, FIXED_WORKFLOW)
+    page_contract = PAGE_CONTRACTS.get(page)
+    if not page_contract:
+        raise ValueError(f"Unsupported form page: {page}")
     return "\n\n".join([
         "You are Gemma 4B Computer-Use running fully on device.",
-        "Task: multi-step Always-on form filling workflow for a senior assistance demo.",
+        "Task: multi-step Always-on form filling for a senior assistance app.",
         "No cloud planner is available. Do not ask for cloud help.",
         "Return ONLY strict JSON. Do not include markdown.",
         "Schema: {\"summary\":\"short Chinese status\",\"actions\":[{\"type\":\"click|type|select|guard\",\"target\":\"element id\",\"value\":\"value\",\"reason\":\"Chinese reason\"}]}",
         "You must reason from the current visible page only. The user will observe a new page after any next-page click.",
         f"Current page number: {page}",
-        "Use exactly these visible element ids in order:",
-        json.dumps([item["target"] for item in page_contract["actions"]], ensure_ascii=False),
+        "Visible element ids:",
+        json.dumps(page_contract["allowed_targets"], ensure_ascii=False),
+        "Required element ids that should appear in the action plan:",
+        json.dumps(page_contract["required_targets"], ensure_ascii=False),
+        f"You must return exactly {len(page_contract['required_targets'])} actions, one for each required element id, in the same order.",
+        "For text inputs use type. For native dropdowns use select. For next-button use click. For submit-button use guard.",
         "Never click submit-button. Use guard for submit-button.",
         "Use this local memory:",
         json.dumps({
@@ -137,26 +121,40 @@ def build_prompt(observation):
     ])
 
 
-def merge_with_fixed_workflow(model_plan, observation):
-    fixed_workflow = PAGE_WORKFLOWS.get(current_page(observation), FIXED_WORKFLOW)
-    model_actions = model_plan.get("actions", [])
-    merged_actions = []
-    for fixed in fixed_workflow["actions"]:
-        candidate = find_matching_action(model_actions, fixed)
-        if not candidate or not is_safe_action(candidate):
-            merged_actions.append(fixed)
-            continue
-        merged_actions.append({
-            **fixed,
-            "type": candidate.get("type", fixed["type"]),
-            "target": candidate.get("target", fixed["target"]),
-            "reason": candidate.get("reason") if readable(candidate.get("reason")) else fixed["reason"],
-        })
-
+def validate_model_plan(model_plan, observation):
+    page_contract = PAGE_CONTRACTS.get(current_page(observation))
+    model_actions = [
+        normalize_action(action)
+        for action in model_plan.get("actions", [])
+    ]
+    safe_actions = [
+        action for action in model_actions
+        if action and action["target"] in page_contract["allowed_targets"] and is_safe_action(action)
+    ]
+    required_targets = set(page_contract["required_targets"])
+    returned_targets = {action["target"] for action in safe_actions}
+    missing_targets = required_targets - returned_targets
+    if missing_targets:
+        raise ValueError(f"Gemma action plan missing required targets: {', '.join(sorted(missing_targets))}")
     summary = model_plan.get("summary")
     return {
-        "summary": summary if readable(summary) else fixed_workflow["summary"],
-        "actions": merged_actions,
+        "summary": summary if readable(summary) else "本地 Gemma 已生成 Always-on GUI 动作。",
+        "actions": safe_actions,
+    }
+
+
+def normalize_action(action):
+    if not isinstance(action, dict):
+        return None
+    action_type = str(action.get("type", ""))
+    target = str(action.get("target", ""))
+    if target in SELECT_TARGETS and action_type == "type":
+        action_type = "select"
+    return {
+        "type": action_type,
+        "target": target,
+        "value": "" if action.get("value") is None else str(action.get("value")),
+        "reason": str(action.get("reason", "")),
     }
 
 
@@ -165,13 +163,6 @@ def current_page(observation):
         return int(observation.get("currentPage") or observation.get("page") or 1)
     except Exception:
         return 1
-
-
-def find_matching_action(actions, fixed):
-    for action in actions:
-        if action.get("type") == fixed["type"] and action.get("target") == fixed["target"]:
-            return action
-    return None
 
 
 def is_safe_action(action):

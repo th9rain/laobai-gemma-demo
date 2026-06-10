@@ -11,13 +11,13 @@
       <section class="operator">
         <h1>老白 Agent Web Demo</h1>
         <p>
-          电脑端运行的手机竖屏模拟 demo。Always-on 走本地固定 Workflow + Gemma 4B Computer-Use；Trigger 看病挂号才使用 Gemma 4 30B Cloud Planner。页面不展示 API Key，模型调用通过本地 server 代理。
+          电脑端运行的手机竖屏模拟界面。Always-on 必须调用本地 Gemma LiteRT 权重生成 GUI action；Trigger 看病挂号保留云侧 Planner。页面不展示 API Key，模型调用通过本地 server 代理。
         </p>
         <div class="operator-panel">
           <div class="model-row">
             <div>
               <strong>Demo 1：Always-on 自动填表</strong>
-              <span>本地 workflow 主动识别报名表，自动填写常用资料，提交前停止。</span>
+              <span>本地 Gemma 权重根据页面 observation 生成动作，自动填写常用资料，提交前停止。</span>
             </div>
             <a class="primary-btn" href="./always-on-form.html?autostart=1" style="text-decoration:none; display:inline-grid; place-items:center;">打开</a>
           </div>

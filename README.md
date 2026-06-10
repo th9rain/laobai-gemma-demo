@@ -4,14 +4,14 @@
 
 核心 case：
 
-- `Always-on 自动填表`：端侧识别社区报名表，本地固定 workflow + Gemma 4B/E4B 校验动作，自动填写常用资料，停在提交前。
+- `Always-on 自动填表`：端侧识别社区报名表，必须调用本地 Gemma 4B/E4B LiteRT 权重生成 GUI action，自动填写常用资料，停在提交前。
 - `Trigger 看病挂号`：用户触发“我胃不舒服，帮我挂号”，云侧 Planner 做复杂规划，端侧 Gemma 执行 GUI 动作，停在确认/支付/验证码前。
 
 ## 快速开始
 
 需要本机安装 Node.js 18+。
 
-只跑 `Always-on 自动填表` 的离线版本：
+只跑 `Always-on 自动填表` 的真实本地 Gemma 权重版本：
 
 ```powershell
 .\tools\download-gemma-model.ps1
@@ -19,7 +19,7 @@
 .\run-always-on-demo.ps1
 ```
 
-这个入口会忽略 `config.local.json`，不会读取云端 planner endpoint 或 key。它只使用本地 `models/gemma-4-E4B-it.litertlm` 和 `.venv/Scripts/python.exe`。
+这个入口会忽略 `config.local.json`，不会读取云端 planner endpoint 或 key。它只使用本地 `models/gemma-4-E4B-it.litertlm` 和 `.venv/Scripts/python.exe`。如果权重、Python 环境或模型输出不可用，Always-on 会直接失败，不会静态兜底填表。
 
 如果想看更接近真实自动化的版本，先安装 Node 依赖：
 
@@ -29,7 +29,7 @@ npx playwright install chromium
 .\run-external-always-on.ps1
 ```
 
-这个入口会启动本地 server，然后用外部 Playwright 脚本读取页面 observation，请求本地 Gemma workflow，再由脚本从页面外部执行 `fill/select/click`。它不是页面 JS 自己填自己。
+这个入口会启动本地 server，然后用外部 Playwright 脚本读取页面 observation，请求本地 Gemma 权重生成 action，再由脚本从页面外部执行 `fill/select/click`。它不是页面 JS 自己填自己。
 脚本默认会打开一个可见浏览器窗口，方便录屏；如果只想在后台验证，可以先设置 `$env:LAOBAI_HEADLESS="1"`。
 
 也可以不打开网页，直接在命令行跑本地 workflow：
@@ -38,7 +38,7 @@ npx playwright install chromium
 .\run-always-on-workflow.ps1
 ```
 
-它会输出本地 Gemma 解析后的 action JSON，可用于检查 workflow 是否可离线运行。
+它会输出本地 Gemma 解析后的 action JSON，可用于检查真实权重是否能返回可执行动作。
 
 运行完整 Web Demo：
 
@@ -55,7 +55,7 @@ npx playwright install chromium
 .\run-trigger-demo.ps1
 ```
 
-两个 HTML 也可以直接双击打开做离线演示；这时会使用页面内置的安全 action 序列。需要隐藏 Key 的模型调用时，使用上面的本地 server 启动方式。
+Always-on 不能直接双击 HTML 运行，必须通过本地 server 调用真实 Gemma 权重。Trigger 页面在没有云端配置时仍保留本地安全 fallback，保证挂号流程可展示。
 
 ## 模型调用与 Key
 
@@ -87,19 +87,19 @@ Copy-Item config.example.json config.local.json
 }
 ```
 
-Always-on 填表不请求云端 planner。它会走 `tools/always-on-workflow.py`，由本地固定 workflow 调用 Gemma LiteRT 权重生成/校验动作，再解析成 GUI action。
+Always-on 填表不请求云端 planner。它会走 `tools/always-on-workflow.py`，由本地 Gemma LiteRT 权重直接生成 GUI action；模型必须返回合法 JSON action plan，否则本轮失败。
 当前表单被拆成两页：第一页填写姓名、年龄段、手机号，点击下一页后重新观察第二页；第二页填写居住区域、紧急联系人、课程和学习目标，并在提交前停住。因此正常录屏会看到两次本地 Gemma 调用。
 Trigger 挂号才会先请求私有 planner adapter，再把规划交给本地 Gemma / Computer-Use adapter 生成最终 GUI action；如果 adapter 不可用，才退回浏览器执行器。
 
 页面只显示：
 
 - `Gemma 4B Computer-Use`
-- Always-on 页面：`本地固定 Workflow`
+- Always-on 页面：`真实本地 Gemma 权重`
 - Trigger 页面：`Gemma 4 30B Cloud Planner`
 
 实际请求由 `tools/demo-server.mjs` 的 `/api/plan` 代理完成。浏览器前端只能看到 `/api/plan`，看不到真实 Key、真实 endpoint、真实 model 或底层服务。Always-on 分支只在本地执行；Trigger 分支才会调用云侧 Planner。
 
-如果没有配置 Key，demo 会自动使用本地安全 fallback action，保证演示可运行。
+如果没有配置云端 Key，Trigger 挂号会自动使用本地安全 fallback action，保证挂号流程可运行；Always-on 不使用静态 fallback。
 
 ## Demo 行为
 
@@ -110,7 +110,7 @@ Trigger 挂号才会先请求私有 planner adapter，再把规划交给本地 G
 1. 点击 `启动 Agent` 或用 `?autostart=1` 自动启动。
 2. 页面生成脱敏观察摘要。
 3. 本地 server 调用 `tools/always-on-workflow.py`。
-4. Python workflow 调用本地 Gemma LiteRT 权重，解析/校验固定 action JSON。
+4. Python 调用本地 Gemma LiteRT 权重，要求模型返回合法 JSON action plan。
 5. 右侧显示本次真实送给模型的 Prompt 和模型原始输出。
 6. 执行器逐步操作模拟手机页面：
    - 第一次调用：输入姓名、年龄段、手机号，点击下一页

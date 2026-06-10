@@ -59,7 +59,7 @@ run-always-on-workflow.ps1
 页面上只展示两个演示能力：
 
 - `Gemma 4B Computer-Use`：端侧屏幕理解、控件定位、动作执行。
-- `Gemma 4B/E4B LiteRT Computer-Use`：本地读取 `models/gemma-4-E4B-it.litertlm`，用于 Always-on 固定 workflow 的动作生成/校验，也用于 Trigger 的 GUI action 转换。
+- `Gemma 4B/E4B LiteRT Computer-Use`：本地读取 `models/gemma-4-E4B-it.litertlm`。Always-on 必须由这个本地权重生成 GUI action；Trigger 可继续使用云端 Planner 后再交给本地 Gemma / 执行器转换。
 - `Gemma 4 30B Cloud Planner`：只用于 Trigger 看病挂号这类复杂规划，生成候选计划。
 
 实际 endpoint、model、key 存在本地 `config.local.json` 或环境变量里。公开仓库不提交真实 Key，也不暴露底层服务。

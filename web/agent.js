@@ -5,6 +5,7 @@ window.bootAgent = async function bootAgent(options) {
     running: false,
     step: 0,
     config: { plannerLabel: "Gemma 4 30B Cloud Planner", edgeLabel: "Gemma 4B Computer-Use", plannerOnline: false },
+    modelCallCount: 0,
   };
 
   const trace = document.querySelector("[data-trace]");
@@ -13,6 +14,7 @@ window.bootAgent = async function bootAgent(options) {
   const plannerBadge = document.querySelector("[data-planner-badge]");
   const plannerLabel = document.querySelector("[data-planner-label]");
   const edgeLabel = document.querySelector("[data-edge-label]");
+  const modelIo = document.querySelector("[data-model-io]");
 
   state.config = await loadPublicConfig();
   if (plannerLabel) plannerLabel.textContent = state.config.plannerLabel;
@@ -39,18 +41,52 @@ window.bootAgent = async function bootAgent(options) {
     addTrace("启动 Agent", startupTraceText(options.scenario));
     showToast("老白正在观察当前手机页面。");
 
-    const observation = options.observe();
-    const plan = await requestPlan(options.scenario, observation);
-    addTrace("隐私防火墙", runtimePrivacyText(plan.runtime));
-    addTrace(plannerTraceTitle(plan.runtime, options.scenario), runtimePlannerText(plan.runtime));
-    addTrace("Computer Use 状态", runtimeEdgeText(plan.runtime));
-    addTrace("规划完成", `${plan.summary || "已生成安全动作序列"}（${plan.source || "safe-policy"}）`);
+    if (options.scenario === "always-on-form") {
+      await runAlwaysOnWorkflow();
+    } else {
+      const observation = options.observe();
+      const plan = await requestPlan(options.scenario, observation);
+      renderModelCalls(plan.modelCalls);
+      addTrace("隐私防火墙", runtimePrivacyText(plan.runtime));
+      addTrace(plannerTraceTitle(plan.runtime, options.scenario), runtimePlannerText(plan.runtime));
+      addTrace("Computer Use 状态", runtimeEdgeText(plan.runtime));
+      addTrace("规划完成", `${plan.summary || "已生成安全动作序列"}（${plan.source || "safe-policy"}）`);
 
-    for (const action of plan.actions || []) {
-      await executeAction(action);
+      for (const action of plan.actions || []) {
+        await executeAction(action);
+      }
     }
 
     state.running = false;
+  }
+
+  async function runAlwaysOnWorkflow() {
+    const maxPasses = 3;
+    for (let pass = 1; pass <= maxPasses; pass += 1) {
+      const observation = options.observe();
+      addTrace(`第 ${pass} 次观察`, `当前页面：第 ${observation.currentPage || pass} 页；可见字段：${(observation.visibleFields || []).join("、")}`);
+      const plan = await requestPlan(options.scenario, observation);
+      renderModelCalls(plan.modelCalls);
+      addTrace("隐私防火墙", runtimePrivacyText(plan.runtime));
+      addTrace(plannerTraceTitle(plan.runtime, options.scenario), runtimePlannerText(plan.runtime));
+      addTrace("Computer Use 状态", runtimeEdgeText(plan.runtime));
+      addTrace("规划完成", `${plan.summary || "已生成安全动作序列"}（${plan.source || "safe-policy"}）`);
+
+      let shouldContinue = false;
+      for (const action of plan.actions || []) {
+        await executeAction(action);
+        if (action.type === "click" && action.target === "next-button") {
+          shouldContinue = true;
+          await delay(700);
+          break;
+        }
+        if (action.type === "guard") {
+          return;
+        }
+      }
+      if (!shouldContinue) return;
+    }
+    addTrace("停止", "已达到最大本地 workflow 轮数。", true);
   }
 
   async function executeAction(action) {
@@ -101,6 +137,29 @@ window.bootAgent = async function bootAgent(options) {
     trace?.scrollTo({ top: trace.scrollHeight, behavior: "smooth" });
   }
 
+  function renderModelCalls(calls = []) {
+    if (!modelIo || !Array.isArray(calls)) return;
+    for (const call of calls) {
+      state.modelCallCount += 1;
+      const item = document.createElement("details");
+      item.className = "model-call";
+      item.open = true;
+      item.innerHTML = `
+        <summary>${escapeHtml(call.title || `本地 Gemma 调用 ${state.modelCallCount}`)}</summary>
+        <div class="model-call-block">
+          <div class="model-call-label">模型输入 Prompt</div>
+          <pre>${escapeHtml(call.input || "")}</pre>
+        </div>
+        <div class="model-call-block">
+          <div class="model-call-label">模型原始输出</div>
+          <pre>${escapeHtml(call.output || "")}</pre>
+        </div>
+      `;
+      modelIo.appendChild(item);
+    }
+    modelIo.scrollTo({ top: modelIo.scrollHeight, behavior: "smooth" });
+  }
+
   function applyScenarioLabels() {
     if (options.scenario !== "always-on-form") return;
     if (plannerLabel) plannerLabel.textContent = "本地固定 Workflow";
@@ -109,7 +168,7 @@ window.bootAgent = async function bootAgent(options) {
 
 async function requestPlan(scenario, observation) {
   if (window.location.protocol === "file:") {
-    return fallbackPlan(scenario);
+    return fallbackPlan(scenario, observation);
   }
   try {
     const response = await fetch("/api/plan", {
@@ -118,11 +177,11 @@ async function requestPlan(scenario, observation) {
       body: JSON.stringify({ scenario, observation }),
     });
     if (!response.ok) {
-      return fallbackPlan(scenario);
+      return fallbackPlan(scenario, observation);
     }
     return response.json();
   } catch {
-    return fallbackPlan(scenario);
+    return fallbackPlan(scenario, observation);
   }
 }
 
@@ -143,7 +202,7 @@ async function loadPublicConfig() {
   }
 }
 
-function fallbackPlan(scenario) {
+function fallbackPlan(scenario, observation = {}) {
   if (scenario === "trigger-health") {
     return {
       ok: true,
@@ -166,16 +225,27 @@ function fallbackPlan(scenario) {
     source: "static-html-policy",
     summary: "静态 HTML 模式：使用内置安全动作序列演示自动填表。",
     runtime: fallbackRuntime(),
-    actions: [
-      { type: "type", target: "name", value: "李桂兰", reason: "填写本地记忆中的姓名" },
-      { type: "type", target: "age", value: "70s", reason: "填写年龄段" },
-      { type: "type", target: "phone", value: "138****2675", reason: "只填写脱敏手机号" },
+    actions: alwaysOnStaticActions(observation),
+  };
+}
+
+function alwaysOnStaticActions(observation = {}) {
+  const page = Number(observation.currentPage || 1);
+  if (page === 2) {
+    return [
       { type: "type", target: "area", value: "北京市朝阳区望京街道", reason: "填写居住区域" },
       { type: "type", target: "contact", value: "女儿 王敏", reason: "填写紧急联系人" },
       { type: "select", target: "course", value: "智能手机基础课", reason: "选择偏好课程" },
+      { type: "type", target: "learning-goal", value: "想学会微信视频、线上挂号和识别诈骗短信。", reason: "填写学习目标" },
       { type: "guard", target: "submit-button", reason: "提交报名属于高风险动作，必须停住" },
-    ],
-  };
+    ];
+  }
+  return [
+    { type: "type", target: "name", value: "李桂兰", reason: "填写本地记忆中的姓名" },
+    { type: "type", target: "age", value: "70s", reason: "填写年龄段" },
+    { type: "type", target: "phone", value: "138****2675", reason: "只填写脱敏手机号" },
+    { type: "click", target: "next-button", reason: "第一页填写完成，进入第二页继续观察" },
+  ];
 }
 
 function fallbackRuntime() {

@@ -1,0 +1,13 @@
+{
+  "name": "laobai-gemma-demo",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "verify": "node tools/verify-demo.mjs",
+    "external:always-on": "node tools/external-always-on-runner.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.54.0"
+  }
+}

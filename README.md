@@ -21,6 +21,17 @@
 
 这个入口会忽略 `config.local.json`，不会读取云端 planner endpoint 或 key。它只使用本地 `models/gemma-4-E4B-it.litertlm` 和 `.venv/Scripts/python.exe`。
 
+如果想看更接近真实自动化的版本，先安装 Node 依赖：
+
+```powershell
+npm install
+npx playwright install chromium
+.\run-external-always-on.ps1
+```
+
+这个入口会启动本地 server，然后用外部 Playwright 脚本读取页面 observation，请求本地 Gemma workflow，再由脚本从页面外部执行 `fill/select/click`。它不是页面 JS 自己填自己。
+脚本默认会打开一个可见浏览器窗口，方便录屏；如果只想在后台验证，可以先设置 `$env:LAOBAI_HEADLESS="1"`。
+
 也可以不打开网页，直接在命令行跑本地 workflow：
 
 ```powershell
@@ -77,6 +88,7 @@ Copy-Item config.example.json config.local.json
 ```
 
 Always-on 填表不请求云端 planner。它会走 `tools/always-on-workflow.py`，由本地固定 workflow 调用 Gemma LiteRT 权重生成/校验动作，再解析成 GUI action。
+当前表单被拆成两页：第一页填写姓名、年龄段、手机号，点击下一页后重新观察第二页；第二页填写居住区域、紧急联系人、课程和学习目标，并在提交前停住。因此正常录屏会看到两次本地 Gemma 调用。
 Trigger 挂号才会先请求私有 planner adapter，再把规划交给本地 Gemma / Computer-Use adapter 生成最终 GUI action；如果 adapter 不可用，才退回浏览器执行器。
 
 页面只显示：
@@ -99,11 +111,13 @@ Trigger 挂号才会先请求私有 planner adapter，再把规划交给本地 G
 2. 页面生成脱敏观察摘要。
 3. 本地 server 调用 `tools/always-on-workflow.py`。
 4. Python workflow 调用本地 Gemma LiteRT 权重，解析/校验固定 action JSON。
-5. 执行器逐步操作模拟手机页面：
-   - 输入姓名、年龄段、手机号、居住区域、紧急联系人
+5. 右侧显示本次真实送给模型的 Prompt 和模型原始输出。
+6. 执行器逐步操作模拟手机页面：
+   - 第一次调用：输入姓名、年龄段、手机号，点击下一页
+   - 第二次调用：输入居住区域、紧急联系人
    - 选择报名课程
    - 停在 `提交报名`
-6. 右侧实时显示每一步 action 和原因。
+7. 右侧实时显示每一步 action 和原因。
 
 ### Trigger 看病挂号
 

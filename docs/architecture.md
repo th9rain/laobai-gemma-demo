@@ -33,6 +33,18 @@ run-always-on-demo.ps1
   -> tools/always-on-workflow.py 调用本地 Gemma 权重
 ```
 
+Always-on 外部执行器入口：
+
+```text
+run-external-always-on.ps1
+  -> 启动本地 server，但不打开浏览器
+  -> tools/external-always-on-runner.mjs 打开 always-on-form.html?external=1
+  -> Playwright 在页面外部读取 observeAlwaysOnForm()
+  -> POST /api/plan 获取本地 Gemma workflow 输出
+  -> Playwright 按模型输出执行 fill/select/click
+  -> 打印最终表单状态和两次模型调用摘要
+```
+
 命令行 workflow 验证入口：
 
 ```text
@@ -92,21 +104,30 @@ Trigger 分支才会先调用云端 planner，再调用本地 Gemma 生成/校�
 链路：
 
 - `run-always-on-demo.ps1` 显式关闭云端配置，只启用本地 Gemma
-- `Accessibility/页面摘要` 识别固定社区报名表
+- 第 1 页 observation 识别基础信息表单
 - `/api/plan` 进入 `always-on-local-only` 分支
-- `tools/always-on-workflow.py` 调用本地 Gemma LiteRT 权重
+- `tools/always-on-workflow.py` 调用本地 Gemma LiteRT 权重，并返回 `modelInput` / `modelOutput`
 - Python 脚本解析模型输出，并用固定 workflow 模板校验字段和值
-- 浏览器执行器按 action JSON 操作模拟手机
+- 执行器填写第一页并点击 `下一页`
+- 第 2 页重新 observation，再次调用本地 Gemma
+- 执行器填写第二页，并用 `guard` 停在提交前
 
 动作：
 
 - 填写姓名：李桂兰
 - 填写年龄段：70s
 - 填写脱敏手机号：138****2675
+- 点击下一页
 - 填写居住区域：北京市朝阳区望京街道
 - 填写紧急联系人：女儿 王敏
 - 选择报名课程：智能手机基础课
+- 填写学习目标：想学会微信视频、线上挂号和识别诈骗短信。
 - `guard` 停在提交报名
+
+右侧模型 I/O 面板展示每次调用的：
+
+- `模型输入 Prompt`：包含当前页码、可见控件 id、端侧本地记忆、脱敏 observation 和安全规则。
+- `模型原始输出`：Gemma LiteRT 返回的原文，便于录屏时证明不是静态字幕。
 
 ## Demo 2：Trigger 看病挂号
 

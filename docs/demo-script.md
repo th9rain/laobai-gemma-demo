@@ -9,13 +9,23 @@
 .\run-always-on-demo.ps1
 ```
 
-3. 录完整 demo 时运行：
+3. 如果想演示“外部脚本读取模型输出后真实操作网页控件”，运行：
+
+```powershell
+npm install
+npx playwright install chromium
+.\run-external-always-on.ps1
+```
+
+这个脚本默认打开可见浏览器窗口，适合录屏。只做后台验证时，可以先设置 `$env:LAOBAI_HEADLESS="1"`。
+
+4. 录完整 demo 时运行：
 
 ```powershell
 .\run-demo-server.ps1
 ```
 
-4. 浏览器打开首页后开始录屏。
+5. 浏览器打开首页后开始录屏。
 
 如果现场网络或本地模型服务不可用，可以直接打开 `web/always-on-form.html` 和 `web/trigger-health.html`，页面会使用内置安全 action 序列保证演示连续。
 
@@ -27,17 +37,22 @@
 4. 右侧展示：
    - Gemma 4B Computer-Use
    - 本地固定 Workflow
-5. Agent 自动填写：
+5. 右侧展开 `模型输入 Prompt` 和 `模型原始输出`。内容来自 `tools/always-on-workflow.py` 对本地 Gemma LiteRT 权重的实际调用。
+6. 第一次本地 Gemma 调用后，Agent 自动填写第一页：
    - 李桂兰
    - 70s
    - 138****2675
+7. Agent 点击 `下一页`。
+8. 页面翻到第二页后，Agent 重新观察当前页面，并进行第二次本地 Gemma 调用。
+9. 第二次调用后，Agent 自动填写：
    - 北京市朝阳区望京街道
    - 女儿 王敏
    - 智能手机基础课
-6. Agent 停在 `提交报名` 前。
+   - 想学会微信视频、线上挂号和识别诈骗短信。
+10. Agent 停在 `提交报名` 前。
 
 讲解重点：Always-on 不是连续录屏，而是页面状态触发；端侧执行低风险动作，提交前停住。
-Always-on 不请求云端 Planner，本轮只展示本地固定 Workflow 和端侧 Gemma。
+Always-on 不请求云端 Planner，本轮只展示本地固定 Workflow 和端侧 Gemma。两页表单会触发两次本地模型调用，右侧能看到每次模型的输入和输出。
 
 ## Demo 2：Trigger 看病挂号
 

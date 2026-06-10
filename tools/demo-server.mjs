@@ -171,6 +171,11 @@ async function alwaysOnLocalWorkflowRequest(payload, fallback) {
     const normalized = normalizePlan(JSON.stringify(result.plan), fallback, "always-on-local-gemma-workflow");
     return withRuntime({
       ...normalized,
+      modelCalls: [{
+        title: `Always-on 本地 Gemma 调用 / 第 ${payload?.observation?.currentPage || 1} 页`,
+        input: result.modelInput || "",
+        output: result.modelOutput || "",
+      }],
       note: "Always-on fixed workflow produced by local Gemma and parsed by Python.",
     }, alwaysOnRuntimePatch({
       localGemmaConfigured: true,
@@ -662,16 +667,27 @@ function fallbackPlan(payload) {
     ok: true,
     source: "edge-policy",
     summary: "端侧 Computer-Use 策略识别报名表，并停在提交前。",
-    actions: [
-      { type: "type", target: "name", value: "李桂兰", reason: "填写本地记忆中的姓名" },
-      { type: "type", target: "age", value: "70s", reason: "填写年龄段" },
-      { type: "type", target: "phone", value: "138****2675", reason: "只填写脱敏手机号" },
+    actions: alwaysOnFallbackActions(payload),
+  };
+}
+
+function alwaysOnFallbackActions(payload) {
+  const page = Number(payload?.observation?.currentPage || 1);
+  if (page === 2) {
+    return [
       { type: "type", target: "area", value: "北京市朝阳区望京街道", reason: "填写居住区域" },
       { type: "type", target: "contact", value: "女儿 王敏", reason: "填写紧急联系人" },
       { type: "select", target: "course", value: "智能手机基础课", reason: "选择偏好课程" },
+      { type: "type", target: "learning-goal", value: "想学会微信视频、线上挂号和识别诈骗短信。", reason: "填写学习目标" },
       { type: "guard", target: "submit-button", reason: "提交报名属于高风险动作，必须停住" },
-    ],
-  };
+    ];
+  }
+  return [
+    { type: "type", target: "name", value: "李桂兰", reason: "填写本地记忆中的姓名" },
+    { type: "type", target: "age", value: "70s", reason: "填写年龄段" },
+    { type: "type", target: "phone", value: "138****2675", reason: "只填写脱敏手机号" },
+    { type: "click", target: "next-button", reason: "第一页填写完成，进入第二页继续观察" },
+  ];
 }
 
 function isSafeAction(action) {

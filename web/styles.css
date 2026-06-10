@@ -244,8 +244,8 @@ button.agent-active {
 }
 
 .trace {
-  min-height: 260px;
-  max-height: 430px;
+  min-height: 220px;
+  max-height: 300px;
   overflow: auto;
   display: grid;
   gap: 8px;
@@ -289,6 +289,58 @@ button.agent-active {
   color: var(--muted);
   font-size: 12px;
   line-height: 1.4;
+}
+
+.model-io {
+  max-height: 360px;
+  overflow: auto;
+  display: grid;
+  gap: 10px;
+  padding-right: 4px;
+}
+
+.model-call {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.model-call summary {
+  cursor: pointer;
+  padding: 9px 10px;
+  font-weight: 800;
+  font-size: 13px;
+  background: var(--blue-soft);
+  color: #284972;
+}
+
+.model-call-block {
+  border-top: 1px solid var(--line);
+  padding: 9px 10px;
+}
+
+.model-call-label {
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--muted);
+}
+
+.model-call pre {
+  margin: 0;
+  max-height: 190px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 11px;
+  line-height: 1.45;
+  font-family: "Cascadia Mono", Consolas, monospace;
+  color: #26322c;
+  background: #f7f9f6;
+  border: 1px solid #e3e9e3;
+  border-radius: 6px;
+  padding: 8px;
 }
 
 .agent-toast {

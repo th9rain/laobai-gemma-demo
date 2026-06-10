@@ -38,7 +38,8 @@ async function main() {
       scenario: "always-on-form",
       observation: {
         pageTitle: "北京市朝阳区社区智慧课堂报名表",
-        visibleFields: ["姓名", "年龄段", "手机号", "居住区域", "紧急联系人", "报名课程"],
+        currentPage: 1,
+        visibleFields: ["姓名", "年龄段", "手机号", "下一页"],
       },
     });
     assert(form.runtime?.keyVisibleToBrowser === false, "form runtime exposes key state incorrectly");
@@ -47,8 +48,20 @@ async function main() {
     assert(form.runtime?.plannerSkipped === true, "always-on should not call cloud planner");
     assert(form.runtime?.workflowMode === "always-on-local-only", "always-on should use local workflow mode");
     assertAction(form, "type", "name");
-    assertAction(form, "select", "course");
-    assertAction(form, "guard", "submit-button");
+    assertAction(form, "click", "next-button");
+
+    const formPage2 = await postJson("/api/plan", {
+      scenario: "always-on-form",
+      observation: {
+        pageTitle: "北京市朝阳区社区智慧课堂报名表",
+        currentPage: 2,
+        visibleFields: ["居住区域", "紧急联系人", "报名课程", "学习目标", "提交报名"],
+      },
+    });
+    assert(formPage2.runtime?.plannerSkipped === true, "always-on page 2 should not call cloud planner");
+    assertAction(formPage2, "select", "course");
+    assertAction(formPage2, "type", "learning-goal");
+    assertAction(formPage2, "guard", "submit-button");
 
     const health = await postJson("/api/plan", {
       scenario: "trigger-health",

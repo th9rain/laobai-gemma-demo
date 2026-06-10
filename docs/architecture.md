@@ -11,7 +11,7 @@ PowerShell 启动脚本
   -> tools/demo-server.mjs
     -> 静态托管 web/*.html
     -> /api/public-config 暴露安全显示名
-    -> /api/plan 隐藏 Key 并代理 planner adapter / 端侧 action adapter
+    -> /api/plan 隐藏 Key，并按 scenario 路由到本地 workflow 或云侧 planner
 
 HTML 手机模拟页
   -> web/agent.js
@@ -26,11 +26,13 @@ HTML 手机模拟页
 页面上只展示两个演示能力：
 
 - `Gemma 4B Computer-Use`：端侧屏幕理解、控件定位、动作执行。
-- `Gemma 4 30B Cloud Planner`：云侧复杂规划，生成候选计划。
-- `Gemma 4B/E4B LiteRT Computer-Use`：本地读取 `models/gemma-4-E4B-it.litertlm`，把候选计划转成可执行 GUI action；本地模型不可用时可复用私有 planner adapter，失败后才退回浏览器执行器。
+- `Gemma 4B/E4B LiteRT Computer-Use`：本地读取 `models/gemma-4-E4B-it.litertlm`，用于 Always-on 固定 workflow 的动作生成/校验，也用于 Trigger 的 GUI action 转换。
+- `Gemma 4 30B Cloud Planner`：只用于 Trigger 看病挂号这类复杂规划，生成候选计划。
 
 实际 endpoint、model、key 存在本地 `config.local.json` 或环境变量里。公开仓库不提交真实 Key，也不暴露底层服务。
-如果配置 `localGemmaEnabled=true`，server 会优先调用本地 Gemma LiteRT 模型。没有本地权重或 LiteRT-LM 环境时，server 会复用 `plannerModel` 做 Computer-Use action 转换，并继续保留浏览器执行器 fallback。
+如果配置 `localGemmaEnabled=true`，server 会优先调用本地 Gemma LiteRT 模型。
+Always-on 分支不调用云端 planner：它调用 `tools/always-on-workflow.py`，由 Python 脚本跑本地模型并解析输出。
+Trigger 分支才会先调用云端 planner，再调用本地 Gemma 生成/校验 GUI action；没有本地权重或 LiteRT-LM 环境时，继续保留浏览器执行器 fallback。
 
 ## Planner 输出协议
 
@@ -65,6 +67,14 @@ HTML 手机模拟页
 ## Demo 1：Always-on 自动填表
 
 页面：`web/always-on-form.html`
+
+链路：
+
+- `Accessibility/页面摘要` 识别固定社区报名表
+- `/api/plan` 进入 `always-on-local-only` 分支
+- `tools/always-on-workflow.py` 调用本地 Gemma LiteRT 权重
+- Python 脚本解析模型输出，并用固定 workflow 模板校验字段和值
+- 浏览器执行器按 action JSON 操作模拟手机
 
 动作：
 

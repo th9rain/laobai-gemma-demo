@@ -4,8 +4,8 @@
 
 核心 case：
 
-- `Always-on 自动填表`：识别社区报名表，自动填写常用资料，停在提交前。
-- `Trigger 看病挂号`：用户触发“我胃不舒服，帮我挂号”，完成问询、科室/医院规划、模拟挂号，停在确认/支付/验证码前。
+- `Always-on 自动填表`：端侧识别社区报名表，本地固定 workflow + Gemma 4B/E4B 校验动作，自动填写常用资料，停在提交前。
+- `Trigger 看病挂号`：用户触发“我胃不舒服，帮我挂号”，云侧 Planner 做复杂规划，端侧 Gemma 执行 GUI 动作，停在确认/支付/验证码前。
 
 ## 快速开始
 
@@ -54,14 +54,15 @@ Copy-Item config.example.json config.local.json
 }
 ```
 
-如果没有单独的端侧 Computer-Use adapter，server 会优先调用本地 Gemma LiteRT 模型做第二段 Computer-Use action 转换；失败时才复用私有 planner adapter 或浏览器执行器。
+Always-on 填表不请求云端 planner。它会走 `tools/always-on-workflow.py`，由本地固定 workflow 调用 Gemma LiteRT 权重生成/校验动作，再解析成 GUI action。
+Trigger 挂号才会先请求私有 planner adapter，再把规划交给本地 Gemma / Computer-Use adapter 生成最终 GUI action；如果 adapter 不可用，才退回浏览器执行器。
 
 页面只显示：
 
 - `Gemma 4B Computer-Use`
 - `Gemma 4 30B Cloud Planner`
 
-实际请求由 `tools/demo-server.mjs` 的 `/api/plan` 代理完成。浏览器前端只能看到 `/api/plan`，看不到真实 Key、真实 endpoint、真实 model 或底层服务。server 会先请求私有 planner adapter，再把规划交给本地 Gemma / Computer-Use adapter 生成最终 GUI action；如果 adapter 不可用，才退回浏览器执行器。
+实际请求由 `tools/demo-server.mjs` 的 `/api/plan` 代理完成。浏览器前端只能看到 `/api/plan`，看不到真实 Key、真实 endpoint、真实 model 或底层服务。Always-on 分支只在本地执行；Trigger 分支才会调用云侧 Planner。
 
 如果没有配置 Key，demo 会自动使用本地安全 fallback action，保证演示可运行。
 
@@ -73,12 +74,13 @@ Copy-Item config.example.json config.local.json
 
 1. 点击 `启动 Agent` 或用 `?autostart=1` 自动启动。
 2. 页面生成脱敏观察摘要。
-3. 本地 server 调用私有 planner adapter 或使用 fallback。
-4. 执行器逐步操作模拟手机页面：
+3. 本地 server 调用 `tools/always-on-workflow.py`。
+4. Python workflow 调用本地 Gemma LiteRT 权重，解析/校验固定 action JSON。
+5. 执行器逐步操作模拟手机页面：
    - 输入姓名、年龄段、手机号、居住区域、紧急联系人
    - 选择报名课程
    - 停在 `提交报名`
-5. 右侧实时显示每一步 action 和原因。
+6. 右侧实时显示每一步 action 和原因。
 
 ### Trigger 看病挂号
 

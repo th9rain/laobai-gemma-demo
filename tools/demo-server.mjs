@@ -111,8 +111,145 @@ function effectiveEdgeModel(configData) {
 
 async function plannerRequest(payload) {
   const fallback = fallbackPlan(payload);
+  if (payload?.scenario === "always-on-form") {
+    return alwaysOnLocalWorkflowRequest(payload, fallback);
+  }
   const cloudPlan = await cloudPlannerRequest(payload, fallback);
   return edgeComputerUseRequest(payload, cloudPlan);
+}
+
+async function alwaysOnLocalWorkflowRequest(payload, fallback) {
+  if (!config.localGemmaEnabled) {
+    return withRuntime({
+      ...fallback,
+      source: "always-on-local-workflow",
+      note: "Always-on uses deterministic local workflow; cloud planner is not called.",
+    }, alwaysOnRuntimePatch({
+      localGemmaConfigured: false,
+      localGemmaHandoff: false,
+      localGemmaStatus: "disabled",
+    }));
+  }
+
+  const modelPath = path.resolve(rootDir, config.localGemmaModelPath || "");
+  const pythonPath = path.resolve(rootDir, config.localGemmaPython || "");
+  try {
+    await fs.access(modelPath);
+    await fs.access(pythonPath);
+  } catch {
+    return withRuntime({
+      ...fallback,
+      source: "always-on-local-workflow",
+      note: "Always-on local Gemma is not ready; deterministic local workflow used.",
+    }, alwaysOnRuntimePatch({
+      localGemmaConfigured: true,
+      localGemmaHandoff: false,
+      localGemmaStatus: "not-ready",
+    }));
+  }
+
+  const observationPath = path.join(os.tmpdir(), `laobai-always-on-observation-${Date.now()}-${Math.random().toString(16).slice(2)}.json`);
+  await fs.writeFile(observationPath, JSON.stringify(payload?.observation || {}, null, 2), "utf8");
+  try {
+    const result = await runAlwaysOnWorkflowProcess({
+      pythonPath,
+      modelPath,
+      observationPath,
+      timeoutMs: Number(process.env.LAOBAI_LOCAL_GEMMA_TIMEOUT_MS || 180000),
+    });
+    if (!result.ok || !result.plan) {
+      return withRuntime({
+        ...fallback,
+        source: "always-on-local-workflow",
+        note: "Always-on Python workflow returned no plan; deterministic local workflow used.",
+      }, alwaysOnRuntimePatch({
+        localGemmaConfigured: true,
+        localGemmaHandoff: false,
+        localGemmaStatus: "workflow-empty",
+      }));
+    }
+    const normalized = normalizePlan(JSON.stringify(result.plan), fallback, "always-on-local-gemma-workflow");
+    return withRuntime({
+      ...normalized,
+      note: "Always-on fixed workflow produced by local Gemma and parsed by Python.",
+    }, alwaysOnRuntimePatch({
+      localGemmaConfigured: true,
+      localGemmaHandoff: true,
+      localGemmaStatus: result.modelParsed ? "workflow-ok" : "workflow-fallback",
+      localGemmaParsed: Boolean(result.modelParsed),
+    }));
+  } catch (error) {
+    debugModelCall("always-on-local-workflow", {
+      errorName: String(error?.name || "Error"),
+      errorMessage: sanitizeDebugMessage(error?.message || error),
+    });
+    return withRuntime({
+      ...fallback,
+      source: "always-on-local-workflow",
+      note: "Always-on local Gemma workflow failed; deterministic local workflow used.",
+    }, alwaysOnRuntimePatch({
+      localGemmaConfigured: true,
+      localGemmaHandoff: false,
+      localGemmaStatus: "workflow-failed",
+    }));
+  } finally {
+    fs.unlink(observationPath).catch(() => {});
+  }
+}
+
+function alwaysOnRuntimePatch(extra = {}) {
+  return {
+    workflowMode: "always-on-local-only",
+    plannerConfigured: false,
+    plannerHandoff: false,
+    plannerSkipped: true,
+    plannerStatus: "not-used",
+    edgeConfigured: true,
+    edgeHandoff: true,
+    edgeStatus: "local-workflow",
+    ...extra,
+  };
+}
+
+function runAlwaysOnWorkflowProcess({ pythonPath, modelPath, observationPath, timeoutMs }) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(pythonPath, [
+      path.join(rootDir, "tools", "always-on-workflow.py"),
+      "--model", modelPath,
+      "--observation-file", observationPath,
+    ], {
+      cwd: rootDir,
+      windowsHide: true,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    const timer = setTimeout(() => {
+      child.kill();
+      reject(new Error("Always-on workflow timed out"));
+    }, timeoutMs);
+    const stdout = [];
+    const stderr = [];
+    child.stdout.on("data", (chunk) => stdout.push(chunk));
+    child.stderr.on("data", (chunk) => stderr.push(chunk));
+    child.on("error", (error) => {
+      clearTimeout(timer);
+      reject(error);
+    });
+    child.on("close", (code) => {
+      clearTimeout(timer);
+      const text = Buffer.concat(stdout).toString("utf8").trim();
+      const err = Buffer.concat(stderr).toString("utf8").trim();
+      try {
+        const parsed = JSON.parse(text || "{}");
+        if (code === 0 && parsed.ok) {
+          resolve(parsed);
+          return;
+        }
+        reject(new Error(parsed.error || parsed.text || err || `Always-on workflow exited with ${code}`));
+      } catch {
+        reject(new Error(err || text || `Always-on workflow exited with ${code}`));
+      }
+    });
+  });
 }
 
 async function cloudPlannerRequest(payload, fallback) {

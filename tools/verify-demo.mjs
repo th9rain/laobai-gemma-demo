@@ -44,6 +44,8 @@ async function main() {
     assert(form.runtime?.keyVisibleToBrowser === false, "form runtime exposes key state incorrectly");
     assert(form.runtime?.providerVisibleToBrowser === false, "form runtime exposes provider state incorrectly");
     assert(form.runtime?.modelNameVisibleToBrowser === false, "form runtime exposes model state incorrectly");
+    assert(form.runtime?.plannerSkipped === true, "always-on should not call cloud planner");
+    assert(form.runtime?.workflowMode === "always-on-local-only", "always-on should use local workflow mode");
     assertAction(form, "type", "name");
     assertAction(form, "select", "course");
     assertAction(form, "guard", "submit-button");

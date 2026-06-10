@@ -17,7 +17,11 @@ window.bootAgent = async function bootAgent(options) {
   state.config = await loadPublicConfig();
   if (plannerLabel) plannerLabel.textContent = state.config.plannerLabel;
   if (edgeLabel) edgeLabel.textContent = state.config.edgeLabel;
-  if (plannerBadge) plannerBadge.textContent = state.config.plannerOnline ? "ready" : "offline fallback";
+  if (plannerBadge) {
+    plannerBadge.textContent = options.scenario === "always-on-form"
+      ? "not used"
+      : state.config.plannerOnline ? "ready" : "offline fallback";
+  }
 
   startButton?.addEventListener("click", () => run());
   resetButton?.addEventListener("click", () => window.location.reload());
@@ -192,12 +196,15 @@ function runtimePrivacyText(runtime = {}) {
 }
 
 function runtimePlannerText(runtime = {}) {
+  if (runtime.plannerSkipped) return "Always-on 固定 workflow 不请求云端 Planner，本轮完全本地处理。";
   if (runtime.plannerHandoff) return "Gemma 4 30B 云侧 Planner 已返回安全 JSON action plan。";
   if (runtime.plannerConfigured) return "Gemma 4 30B 云侧 Planner 已配置，但本轮使用安全 fallback。";
   return "Gemma 4 30B 云侧 Planner 未启用，本轮使用本地安全策略。";
 }
 
 function runtimeEdgeText(runtime = {}) {
+  if (runtime.workflowMode === "always-on-local-only" && runtime.localGemmaHandoff) return "本地 Gemma 4B/E4B LiteRT 模型已校验固定填表 workflow。";
+  if (runtime.workflowMode === "always-on-local-only") return "Always-on 使用本地固定 workflow，未调用云端。";
   if (runtime.localGemmaHandoff) return "本地 Gemma 4B/E4B LiteRT 模型已生成 GUI action。";
   if (runtime.localGemmaConfigured && !runtime.localGemmaHandoff) return "本地 Gemma 已配置，但本轮使用安全 fallback 或远端 adapter。";
   if (runtime.edgeHandoff) return "Gemma 4B Computer-Use adapter 已生成 GUI action。";

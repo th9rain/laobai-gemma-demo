@@ -11,6 +11,7 @@ const browser = await chromium.launch({
   headless: process.env.LAOBAI_HEADLESS !== "0",
 });
 const page = await browser.newPage({ viewport: { width: 1280, height: 1000 }, deviceScaleFactor: 1 });
+let keepOpen = process.env.LAOBAI_HEADLESS === "0";
 
 try {
   await page.goto(`${baseUrl}/always-on-form.html?external=1`, { waitUntil: "domcontentloaded" });
@@ -106,9 +107,15 @@ try {
     path: path.join(runDir, "always-on-final-page.png"),
     fullPage: false,
   });
-  await page.waitForTimeout(process.env.LAOBAI_HEADLESS === "0" ? 3000 : 250);
+  await holdBrowserIfVisible(runDir);
+} catch (error) {
+  await renderFatalError(error, runDir);
+  await holdBrowserIfVisible(runDir);
+  throw error;
 } finally {
-  await browser.close();
+  if (!keepOpen) {
+    await browser.close();
+  }
 }
 
 async function capturePhoneScreenshot(currentPage, pass) {
@@ -354,4 +361,27 @@ function actionTitle(action) {
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
+}
+
+async function renderFatalError(error, directory) {
+  const message = String(error?.stack || error?.message || error);
+  await fs.writeFile(path.join(directory, "always-on-error.txt"), message, "utf8").catch(() => {});
+  await page.evaluate(({ message, directory }) => {
+    window.updateRunStatus?.("error");
+    window.renderExternalEvent?.({
+      title: "运行中断",
+      detail: `${message.slice(0, 260)}\n调试目录：${directory}`,
+      guard: true,
+    });
+  }, { message, directory }).catch(() => {});
+}
+
+async function holdBrowserIfVisible(directory) {
+  if (!keepOpen) {
+    await page.waitForTimeout(250);
+    return;
+  }
+  console.log(`Visible browser is kept open for recording. Debug dir: ${directory}`);
+  console.log("Close the browser window or press Ctrl+C in this terminal when done.");
+  await new Promise(() => {});
 }

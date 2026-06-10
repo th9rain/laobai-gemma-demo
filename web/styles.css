@@ -41,16 +41,19 @@ textarea {
 .page {
   min-height: 100vh;
   display: grid;
-  grid-template-columns: minmax(340px, 390px) minmax(0, 760px);
+  width: 100%;
+  grid-template-columns: minmax(340px, min(30vw, 430px)) minmax(0, 1fr);
   gap: 26px;
-  align-items: center;
-  justify-content: center;
+  align-items: stretch;
+  justify-content: stretch;
   padding: 24px;
 }
 
 .phone {
   width: min(390px, calc(100vw - 32px));
   aspect-ratio: 9 / 19.5;
+  align-self: center;
+  justify-self: center;
   border-radius: 34px;
   background: linear-gradient(145deg, #141916, #2a2f2a);
   padding: 12px;
@@ -236,11 +239,14 @@ button.agent-active {
 
 .operator {
   align-self: stretch;
-  max-width: 760px;
+  max-width: none;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .operator-wide {
-  width: min(760px, calc(100vw - 32px));
+  width: 100%;
 }
 
 .hero-copy {
@@ -266,7 +272,7 @@ button.agent-active {
   color: var(--muted);
   line-height: 1.6;
   margin: 10px 0 0;
-  max-width: 760px;
+  max-width: 980px;
 }
 
 .operator-panel {
@@ -281,7 +287,7 @@ button.agent-active {
 
 .status-strip {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(140px, 1fr));
   gap: 10px;
   margin-bottom: 12px;
 }
@@ -314,15 +320,17 @@ button.agent-active {
 }
 
 .showcase-grid {
+  flex: 1;
+  min-height: 0;
   display: grid;
-  grid-template-columns: minmax(230px, 0.68fr) minmax(0, 1.32fr);
+  grid-template-columns: minmax(260px, 0.36fr) minmax(420px, 0.64fr);
   gap: 12px;
   align-items: stretch;
 }
 
 .run-panel,
 .io-panel {
-  min-height: 520px;
+  min-height: min(560px, calc(100vh - 330px));
   border: 1px solid rgba(217, 224, 218, 0.9);
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.9);
@@ -598,5 +606,25 @@ button.agent-active {
 
   .model-screenshot {
     max-width: 100%;
+  }
+}
+
+@media (min-width: 1500px) {
+  .page {
+    grid-template-columns: minmax(390px, 440px) minmax(0, 1fr);
+    gap: 34px;
+    padding: 30px 36px;
+  }
+
+  .phone {
+    width: min(430px, 30vw);
+  }
+
+  .operator h1 {
+    font-size: 44px;
+  }
+
+  .showcase-grid {
+    grid-template-columns: minmax(320px, 0.32fr) minmax(620px, 0.68fr);
   }
 }

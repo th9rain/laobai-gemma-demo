@@ -224,6 +224,7 @@ function runAlwaysOnWorkflowProcess({ pythonPath, modelPath, observationPath, ti
       "--observation-file", observationPath,
     ], {
       cwd: rootDir,
+      env: pythonUtf8Env(),
       windowsHide: true,
       stdio: ["ignore", "pipe", "pipe"],
     });
@@ -399,6 +400,7 @@ function runLocalGemmaProcess({ pythonPath, modelPath, promptPath, timeoutMs }) 
       "--prompt-file", promptPath,
     ], {
       cwd: rootDir,
+      env: pythonUtf8Env(),
       windowsHide: true,
       stdio: ["ignore", "pipe", "pipe"],
     });
@@ -430,6 +432,14 @@ function runLocalGemmaProcess({ pythonPath, modelPath, promptPath, timeoutMs }) 
       }
     });
   });
+}
+
+function pythonUtf8Env() {
+  return {
+    ...process.env,
+    PYTHONIOENCODING: "utf-8",
+    PYTHONUTF8: "1",
+  };
 }
 
 async function invokePlanningModel({ endpoint, model, apiKey, prompt, fallback, timeoutMs, successSource, fallbackSource, unavailableNote }) {

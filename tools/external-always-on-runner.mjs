@@ -44,6 +44,11 @@ try {
     learningGoal: document.getElementById("learning-goal")?.value,
     submitStillVisible: !document.getElementById("submit-button")?.hidden,
   }));
+  const ioAudit = auditModelCalls(modelCalls);
+  assert(ioAudit.ok, ioAudit.error);
+  assert(state.name === "李桂兰", "name was not filled");
+  assert(state.area === "北京市朝阳区望京街道", "page 2 area was not filled");
+  assert(state.learningGoal.includes("识别诈骗短信"), "learning goal was not filled");
 
   console.log(JSON.stringify({
     ok: true,
@@ -52,7 +57,10 @@ try {
       title: call.title,
       inputBytes: Buffer.byteLength(call.input || "", "utf8"),
       outputBytes: Buffer.byteLength(call.output || "", "utf8"),
+      inputHasObservation: String(call.input || "").includes("北京市朝阳区社区智慧课堂报名表"),
+      outputHasChinese: /[\u4e00-\u9fff]/.test(String(call.output || "")),
     })),
+    ioAudit,
     state,
   }, null, 2));
 } finally {
@@ -99,4 +107,39 @@ async function executeAction(action) {
 
 function cssEscape(value) {
   return String(value).replace(/([ #;?%&,.+*~':"!^$[\]()=>|/@])/g, "\\$1");
+}
+
+function auditModelCalls(calls) {
+  if (!Array.isArray(calls) || calls.length !== 2) {
+    return { ok: false, error: `expected exactly 2 model calls, got ${calls?.length || 0}` };
+  }
+  for (const [index, call] of calls.entries()) {
+    const input = String(call.input || "");
+    const output = String(call.output || "");
+    const combined = `${call.title || ""}\n${input}\n${output}`;
+    if (!input.trim() || !output.trim()) {
+      return { ok: false, error: `model call ${index + 1} has empty input or output` };
+    }
+    if (hasMojibake(combined)) {
+      return { ok: false, error: `model call ${index + 1} contains mojibake` };
+    }
+    if (!input.includes(`Current page number: ${index + 1}`)) {
+      return { ok: false, error: `model call ${index + 1} is missing current page marker` };
+    }
+    if (!input.includes("北京市朝阳区社区智慧课堂报名表")) {
+      return { ok: false, error: `model call ${index + 1} is missing Chinese screen observation` };
+    }
+    if (!output.includes("{") || !output.includes("actions") || !/[\u4e00-\u9fff]/.test(output)) {
+      return { ok: false, error: `model call ${index + 1} output is not complete Chinese JSON-like text` };
+    }
+  }
+  return { ok: true };
+}
+
+function hasMojibake(text) {
+  return /�|鑰|濉|绔|鍖|涓|缁|妯|璇|鐢|�/.test(String(text || ""));
+}
+
+function assert(condition, message) {
+  if (!condition) throw new Error(message);
 }

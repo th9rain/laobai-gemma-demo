@@ -60,7 +60,8 @@ Trigger 挂号才会先请求私有 planner adapter，再把规划交给本地 G
 页面只显示：
 
 - `Gemma 4B Computer-Use`
-- `Gemma 4 30B Cloud Planner`
+- Always-on 页面：`本地固定 Workflow`
+- Trigger 页面：`Gemma 4 30B Cloud Planner`
 
 实际请求由 `tools/demo-server.mjs` 的 `/api/plan` 代理完成。浏览器前端只能看到 `/api/plan`，看不到真实 Key、真实 endpoint、真实 model 或底层服务。Always-on 分支只在本地执行；Trigger 分支才会调用云侧 Planner。
 

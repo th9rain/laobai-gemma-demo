@@ -20,7 +20,7 @@
 3. 点击 `启动 Agent`。
 4. 右侧展示：
    - Gemma 4B Computer-Use
-   - Gemma 4 30B Cloud Planner
+   - 本地固定 Workflow
 5. Agent 自动填写：
    - 李桂兰
    - 70s
@@ -31,6 +31,7 @@
 6. Agent 停在 `提交报名` 前。
 
 讲解重点：Always-on 不是连续录屏，而是页面状态触发；端侧执行低风险动作，提交前停住。
+Always-on 不请求云端 Planner，本轮只展示本地固定 Workflow 和端侧 Gemma。
 
 ## Demo 2：Trigger 看病挂号
 
@@ -56,5 +57,5 @@
 ```
 
 ```text
-界面上看不到 Key、真实 endpoint 或底层服务。演示中只展示 Gemma 4B Computer-Use 和 Gemma 4 30B Cloud Planner 的协作。
+界面上看不到 Key、真实 endpoint 或底层服务。Always-on 展示本地 Workflow + Gemma 4B Computer-Use；Trigger 展示 Gemma 4B Computer-Use 和 Gemma 4 30B Cloud Planner 的协作。
 ```

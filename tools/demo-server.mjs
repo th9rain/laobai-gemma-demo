@@ -696,7 +696,10 @@ async function serveFile(res, filePath) {
   };
   try {
     const content = await fs.readFile(filePath);
-    res.writeHead(200, { "Content-Type": types[ext] || "application/octet-stream" });
+    res.writeHead(200, {
+      "Content-Type": types[ext] || "application/octet-stream",
+      "Cache-Control": "no-store, max-age=0",
+    });
     res.end(content);
   } catch {
     res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });

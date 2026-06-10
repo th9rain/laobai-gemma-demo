@@ -17,6 +17,7 @@ window.bootAgent = async function bootAgent(options) {
   state.config = await loadPublicConfig();
   if (plannerLabel) plannerLabel.textContent = state.config.plannerLabel;
   if (edgeLabel) edgeLabel.textContent = state.config.edgeLabel;
+  applyScenarioLabels();
   if (plannerBadge) {
     plannerBadge.textContent = options.scenario === "always-on-form"
       ? "not used"
@@ -35,13 +36,13 @@ window.bootAgent = async function bootAgent(options) {
     if (state.running) return;
     state.running = true;
     startButton.disabled = true;
-    addTrace("启动 Agent", "正在读取屏幕结构，准备请求 planner。");
+    addTrace("启动 Agent", startupTraceText(options.scenario));
     showToast("老白正在观察当前手机页面。");
 
     const observation = options.observe();
     const plan = await requestPlan(options.scenario, observation);
     addTrace("隐私防火墙", runtimePrivacyText(plan.runtime));
-    addTrace("Planner 状态", runtimePlannerText(plan.runtime));
+    addTrace(plannerTraceTitle(plan.runtime, options.scenario), runtimePlannerText(plan.runtime));
     addTrace("Computer Use 状态", runtimeEdgeText(plan.runtime));
     addTrace("规划完成", `${plan.summary || "已生成安全动作序列"}（${plan.source || "safe-policy"}）`);
 
@@ -98,6 +99,11 @@ window.bootAgent = async function bootAgent(options) {
     `;
     trace?.appendChild(item);
     trace?.scrollTo({ top: trace.scrollHeight, behavior: "smooth" });
+  }
+
+  function applyScenarioLabels() {
+    if (options.scenario !== "always-on-form") return;
+    if (plannerLabel) plannerLabel.textContent = "本地固定 Workflow";
   }
 };
 
@@ -185,6 +191,18 @@ function fallbackRuntime() {
     edgeHandoff: false,
     edgeStatus: "browser-executor",
   };
+}
+
+function startupTraceText(scenario) {
+  if (scenario === "always-on-form") {
+    return "正在读取屏幕结构，准备运行端侧固定 workflow。";
+  }
+  return "正在读取屏幕结构，准备请求云侧 Planner。";
+}
+
+function plannerTraceTitle(runtime = {}, scenario = "") {
+  if (runtime.plannerSkipped || scenario === "always-on-form") return "本地 Workflow 状态";
+  return "Planner 状态";
 }
 
 function runtimePrivacyText(runtime = {}) {

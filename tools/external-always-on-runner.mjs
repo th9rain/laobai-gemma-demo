@@ -56,6 +56,7 @@ try {
     }, null, 2), "utf8");
     let shouldContinue = false;
     for (const action of plan.actions || []) {
+      await resetScrollForCoordinateExecution(screenshot);
       const execution = await executeCoordinateAction(action, screenshot);
       await appendJsonl(path.join(runDir, `always-on-pass-${pass}-execution.jsonl`), execution);
       if (action.type === "click" && String(action.label || "").includes("下一页")) {
@@ -120,7 +121,6 @@ try {
 
 async function capturePhoneScreenshot(currentPage, pass) {
   const locator = page.locator("[data-computer-use-surface]");
-  await locator.scrollIntoViewIfNeeded();
   await page.waitForTimeout(120);
   const box = await locator.boundingBox();
   if (!box) throw new Error("phone screen box not found");
@@ -302,7 +302,6 @@ async function getPhoneBox() {
 
 async function getPhoneBoxInViewport() {
   const locator = page.locator("[data-computer-use-surface]");
-  await locator.scrollIntoViewIfNeeded();
   await page.waitForTimeout(80);
   const box = await locator.boundingBox();
   if (!box) throw new Error("computer-use surface box not found");

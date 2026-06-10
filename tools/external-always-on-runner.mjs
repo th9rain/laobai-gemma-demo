@@ -7,11 +7,16 @@ const baseUrl = process.env.LAOBAI_EXTERNAL_BASE_URL || "http://127.0.0.1:4173";
 const runDir = path.join(os.tmpdir(), `laobai-computer-use-${Date.now()}-${Math.random().toString(16).slice(2)}`);
 await fs.mkdir(runDir, { recursive: true });
 
+const headless = process.env.LAOBAI_HEADLESS !== "0";
 const browser = await chromium.launch({
-  headless: process.env.LAOBAI_HEADLESS !== "0",
+  headless,
+  args: headless ? [] : ["--start-maximized", "--window-position=0,0"],
 });
-const page = await browser.newPage({ viewport: { width: 1280, height: 1000 }, deviceScaleFactor: 1 });
-let keepOpen = process.env.LAOBAI_HEADLESS === "0";
+const context = await browser.newContext(headless
+  ? { viewport: { width: 1280, height: 1000 }, deviceScaleFactor: 1 }
+  : { viewport: null });
+const page = await context.newPage();
+let keepOpen = !headless;
 
 try {
   await page.goto(`${baseUrl}/always-on-form.html?external=1`, { waitUntil: "domcontentloaded" });

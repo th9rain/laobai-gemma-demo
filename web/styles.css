@@ -55,17 +55,17 @@ textarea {
   min-height: 0;
   overflow: hidden;
   display: grid;
-  grid-template-columns: clamp(330px, 27vw, 440px) minmax(0, 1fr);
-  gap: clamp(16px, 1.6vw, 30px);
+  grid-template-columns: clamp(300px, 22vw, 410px) minmax(0, 1fr);
+  gap: clamp(12px, 1.1vw, 22px);
   align-items: stretch;
   justify-content: stretch;
-  padding: clamp(12px, 1.5vw, 24px) 0 clamp(12px, 1.5vw, 24px) clamp(12px, 1.5vw, 24px);
+  padding: clamp(10px, 1.2vw, 20px) 0 clamp(10px, 1.2vw, 20px) clamp(10px, 1.2vw, 20px);
 }
 
 .phone {
-  width: min(100%, calc((100vh - 32px) * 9 / 19.5));
-  max-width: 430px;
-  max-height: calc(100vh - 24px);
+  width: min(100%, calc((100vh - 24px) * 9 / 19.5));
+  max-width: 410px;
+  max-height: calc(100vh - 20px);
   aspect-ratio: 9 / 19.5;
   align-self: center;
   justify-self: center;
@@ -281,7 +281,7 @@ button.agent-active {
 
 .operator h1 {
   margin: 0;
-  font-size: clamp(28px, 3vw, 44px);
+  font-size: clamp(28px, 2.6vw, 42px);
   line-height: 1.1;
   letter-spacing: 0;
 }
@@ -343,7 +343,7 @@ button.agent-active {
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(260px, 0.34fr) minmax(420px, 0.66fr);
+  grid-template-columns: minmax(230px, 0.28fr) minmax(0, 0.72fr);
   gap: 12px;
   align-items: stretch;
 }
@@ -426,7 +426,8 @@ button.agent-active {
   min-height: 0;
   max-height: none;
   flex: 1;
-  overflow: auto;
+  overflow-y: auto;
+  overflow-x: hidden;
   overscroll-behavior: contain;
   display: grid;
   align-content: start;
@@ -475,13 +476,13 @@ button.agent-active {
 }
 
 .model-io {
+  min-height: 0;
   max-height: none;
   flex: 1;
-  overflow: auto;
+  overflow-y: auto;
+  overflow-x: hidden;
   overscroll-behavior: contain;
-  display: grid;
-  align-content: start;
-  gap: 10px;
+  display: block;
   padding: 12px;
 }
 
@@ -489,8 +490,12 @@ button.agent-active {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #fff;
-  overflow: hidden;
+  overflow: visible;
   box-shadow: 0 6px 18px rgba(32, 48, 38, 0.06);
+}
+
+.model-call + .model-call {
+  margin-top: 10px;
 }
 
 .model-call summary {
@@ -527,8 +532,8 @@ button.agent-active {
 
 .model-call pre {
   margin: 0;
-  max-height: 210px;
-  overflow: auto;
+  max-height: none;
+  overflow: visible;
   white-space: pre-wrap;
   word-break: break-word;
   font-size: 10.5px;
@@ -648,16 +653,16 @@ button.agent-active {
 
 @media (min-width: 1500px) {
   .page {
-    grid-template-columns: clamp(390px, 24vw, 460px) minmax(0, 1fr);
-    gap: clamp(22px, 2vw, 36px);
-    padding: clamp(18px, 1.8vw, 32px) 0 clamp(18px, 1.8vw, 32px) clamp(18px, 1.8vw, 32px);
+    grid-template-columns: clamp(340px, 20vw, 420px) minmax(0, 1fr);
+    gap: clamp(16px, 1.4vw, 28px);
+    padding: clamp(14px, 1.4vw, 24px) 0 clamp(14px, 1.4vw, 24px) clamp(14px, 1.4vw, 24px);
   }
 
   .phone {
-    width: min(100%, calc((100vh - 48px) * 9 / 19.5));
+    width: min(100%, calc((100vh - 36px) * 9 / 19.5));
   }
 
   .showcase-grid {
-    grid-template-columns: minmax(320px, 0.32fr) minmax(620px, 0.68fr);
+    grid-template-columns: minmax(280px, 0.26fr) minmax(0, 0.74fr);
   }
 }

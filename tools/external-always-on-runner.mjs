@@ -99,10 +99,12 @@ try {
   }, null, 2));
   await page.evaluate(() => {
     window.updateRunStatus?.("guarded");
+    window.scrollTo(0, 0);
   });
+  await page.waitForTimeout(120);
   await page.screenshot({
     path: path.join(runDir, "always-on-final-page.png"),
-    fullPage: true,
+    fullPage: false,
   });
   await page.waitForTimeout(process.env.LAOBAI_HEADLESS === "0" ? 3000 : 250);
 } finally {

@@ -92,15 +92,15 @@ textarea {
 }
 
 .app-content {
-  overflow-y: auto;
+  overflow-y: hidden;
   padding: 14px 16px 20px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
 .notice {
-  padding: 10px 12px;
+  padding: 8px 10px;
   border-radius: 8px;
   background: var(--blue-soft);
   color: #284972;
@@ -128,17 +128,18 @@ textarea {
 .field select,
 .field textarea {
   width: 100%;
-  min-height: 40px;
+  min-height: 58px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #fff;
-  padding: 9px 10px;
+  padding: 14px 12px;
   color: var(--ink);
   outline: none;
+  font-size: 16px;
 }
 
 .field textarea {
-  min-height: 74px;
+  min-height: 88px;
   resize: none;
 }
 
@@ -164,6 +165,46 @@ button.agent-active {
 .primary-btn {
   color: white;
   background: var(--primary);
+}
+
+#next-button {
+  width: 100%;
+  min-height: 70px;
+  font-size: 18px;
+}
+
+.coordinate-grid-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  pointer-events: none;
+  font: 10px/1 "Cascadia Mono", Consolas, monospace;
+  color: rgba(173, 61, 43, 0.62);
+}
+
+.coordinate-grid-line-x,
+.coordinate-grid-line-y {
+  position: absolute;
+  background: rgba(173, 61, 43, 0.16);
+}
+
+.coordinate-grid-line-x {
+  top: 0;
+  bottom: 0;
+  width: 1px;
+}
+
+.coordinate-grid-line-y {
+  left: 0;
+  right: 0;
+  height: 1px;
+}
+
+.coordinate-grid-label {
+  position: absolute;
+  padding: 1px 3px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.82);
 }
 
 .secondary-btn {
@@ -341,6 +382,14 @@ button.agent-active {
   border: 1px solid #e3e9e3;
   border-radius: 6px;
   padding: 8px;
+}
+
+.model-screenshot {
+  width: min(210px, 100%);
+  display: block;
+  border: 1px solid #e3e9e3;
+  border-radius: 8px;
+  background: #f7f9f6;
 }
 
 .agent-toast {

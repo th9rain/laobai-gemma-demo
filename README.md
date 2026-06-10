@@ -1,155 +1,89 @@
 # 老白 Agent Web Demo
 
-这是一个面向路演录屏的端云结合 Agent Web Demo。在电脑上运行本地 server 后，会自动打开两个竖屏手机比例的 HTML 页面，并由 Agent 自动执行任务。
+这个仓库用于验证两个比赛 demo：
 
-核心 case：
+- `Always-on 填表`：必须走真实截图 computer-use 链路。本地 Gemma LiteRT 接收手机页面截图和任务，输出坐标动作 JSON，外部 Playwright runner 按坐标点击和输入。
+- `Trigger 看病挂号`：保留云端 planner 入口。没有云端配置时使用本地安全 fallback，保证挂号流程可展示。
 
-- `Always-on 自动填表`：端侧识别社区报名表，必须调用本地 Gemma 4B/E4B LiteRT 权重生成 GUI action，自动填写常用资料，停在提交前。
-- `Trigger 看病挂号`：用户触发“我胃不舒服，帮我挂号”，云侧 Planner 做复杂规划，端侧 Gemma 执行 GUI 动作，停在确认/支付/验证码前。
+## 当前边界
 
-## 快速开始
+Always-on 不再使用 DOM id、控件列表、结构化 observation 来假装 computer-use。它的输入和输出必须是：
 
-需要本机安装 Node.js 18+。
-
-只跑 `Always-on 自动填表` 的真实本地 Gemma 权重版本：
-
-```powershell
-.\tools\download-gemma-model.ps1
-.\tools\setup-litert-lm.ps1
-.\run-always-on.ps1
+```text
+输入：屏幕截图 PNG + 任务文本
+输出：{"actions":[{"type":"type_at","x":123,"y":456,"text":"李桂兰"}]}
+执行：Playwright page.mouse.click(x, y) + keyboard.type(text)
 ```
 
-这个入口会忽略 `config.local.json`，不会读取云端 planner endpoint 或 key。它只使用本地 `models/gemma-4-E4B-it.litertlm` 和 `.venv/Scripts/python.exe`。如果权重、Python 环境或模型输出不可用，Always-on 会直接失败，不会静态兜底填表。
+如果本地 LiteRT 视觉调用失败或超时，Always-on 会直接失败，不会回退到静态填表。
 
-如果想看更接近真实自动化的版本，先安装 Node 依赖：
+Gemma E4B 在这里按多模态端侧模型使用：Python runner 会用 LiteRT-LM 的 `vision_backend` 加载模型，并把 PNG 截图作为 image content 传给模型。模型返回的 JSON 必须包含 `x/y` 坐标，执行器只按这些坐标操作页面。
+
+## 快速启动
+
+先准备 Node 依赖、Gemma 权重和 LiteRT-LM：
 
 ```powershell
 npm install
 npx playwright install chromium
-.\tools\run-external-always-on.ps1
+.\tools\download-gemma-model.ps1
+.\tools\setup-litert-lm.ps1
 ```
 
-这个入口会启动本地 server，然后用外部 Playwright 脚本读取页面 observation，请求本地 Gemma 权重生成 action，再由脚本从页面外部执行 `fill/select/click`。它不是页面 JS 自己填自己。
-脚本默认会打开一个可见浏览器窗口，方便录屏；如果只想在后台验证，可以先设置 `$env:LAOBAI_HEADLESS="1"`。
-
-也可以不打开网页，直接在命令行跑本地 workflow：
+运行真实 Always-on 截图坐标链路：
 
 ```powershell
-.\tools\run-always-on-workflow.ps1
+.\run-always-on.ps1
 ```
 
-它会输出本地 Gemma 解析后的 action JSON，可用于检查真实权重是否能返回可执行动作。
+这个脚本会启动本地 server、打开一个可见浏览器、截取左侧手机屏幕、调用本地 `models/gemma-4-E4B-it.litertlm`，然后按模型返回的坐标执行填写。右侧会显示截图、Prompt、模型原始输出和解析后的坐标动作。
 
-运行 Trigger 看病挂号：
+正常跑通时会发生两次本地 Gemma 调用：
+
+1. 第 1 页截图：模型输出姓名、年龄段、手机号三个 `type_at` 坐标，以及“下一页”的 `click` 坐标。
+2. 第 2 页截图：模型输出居住区域、联系人、课程、学习目标四个 `type_at` 坐标，并对“提交报名”输出 `guard`，不会点击提交。
+
+每次运行的调试文件会写到 `%TEMP%\laobai-computer-use-*`，里面包含截图、模型输入/输出、坐标计划和执行日志。
+
+运行 Trigger 挂号：
 
 ```powershell
 .\run-trigger.ps1
 ```
 
-根目录只保留两个入口：`run-always-on.ps1` 和 `run-trigger.ps1`。
+## 模型配置
 
-Always-on 不能直接双击 HTML 运行，必须通过本地 server 调用真实 Gemma 权重。Trigger 页面在没有云端配置时仍保留本地安全 fallback，保证挂号流程可展示。
-
-## 模型调用与 Key
-
-页面上不会展示 API Key，也不会展示具体底层供应商或转发服务。
-
-Always-on 不需要配置云端 Key。
-
-公开仓库只提交 `config.example.json`。本地演示时复制一份：
+Always-on 只使用本地 Gemma LiteRT：
 
 ```powershell
-Copy-Item config.example.json config.local.json
+$env:LAOBAI_LOCAL_GEMMA_ENABLED = "1"
+$env:LAOBAI_LOCAL_GEMMA_MODEL_PATH = "models/gemma-4-E4B-it.litertlm"
+$env:LAOBAI_LOCAL_GEMMA_PYTHON = ".venv/Scripts/python.exe"
 ```
 
-如果要运行 Trigger 看病挂号的云侧 planner，再在 `config.local.json` 中填写私有 planner endpoint、model 和 key。这个文件被 `.gitignore` 忽略，不会提交到 GitHub。
-如果要启用本地 Gemma Computer-Use，先下载权重并安装 LiteRT-LM：
-
-```powershell
-.\tools\download-gemma-model.ps1
-.\tools\setup-litert-lm.ps1
-```
-
-然后在 `config.local.json` 中保留：
-
-```json
-{
-  "localGemmaEnabled": true,
-  "localGemmaModelPath": "models/gemma-4-E4B-it.litertlm",
-  "localGemmaPython": ".venv/Scripts/python.exe"
-}
-```
-
-Always-on 填表不请求云端 planner。它会走 `tools/always-on-workflow.py`，由本地 Gemma LiteRT 权重直接生成 GUI action；模型必须返回合法 JSON action plan，否则本轮失败。
-当前表单被拆成两页：第一页填写姓名、年龄段、手机号，点击下一页后重新观察第二页；第二页填写居住区域、紧急联系人、课程和学习目标，并在提交前停住。因此正常录屏会看到两次本地 Gemma 调用。
-Trigger 挂号才会先请求私有 planner adapter，再把规划交给本地 Gemma / Computer-Use adapter 生成最终 GUI action；如果 adapter 不可用，才退回浏览器执行器。
-
-页面只显示：
-
-- `Gemma 4B Computer-Use`
-- Always-on 页面：`真实本地 Gemma 权重`
-- Trigger 页面：`Gemma 4 30B Cloud Planner`
-
-实际请求由 `tools/demo-server.mjs` 的 `/api/plan` 代理完成。浏览器前端只能看到 `/api/plan`，看不到真实 Key、真实 endpoint、真实 model 或底层服务。Always-on 分支只在本地执行；Trigger 分支才会调用云侧 Planner。
-
-如果没有配置云端 Key，Trigger 挂号会自动使用本地安全 fallback action，保证挂号流程可运行；Always-on 不使用静态 fallback。
-
-## Demo 行为
-
-### Always-on 自动填表
-
-执行链路：
-
-1. 点击 `启动 Agent` 或用 `?autostart=1` 自动启动。
-2. 页面生成脱敏观察摘要。
-3. 本地 server 调用 `tools/always-on-workflow.py`。
-4. Python 调用本地 Gemma LiteRT 权重，要求模型返回合法 JSON action plan。
-5. 右侧显示本次真实送给模型的 Prompt 和模型原始输出。
-6. 执行器逐步操作模拟手机页面：
-   - 第一次调用：输入姓名、年龄段、手机号，点击下一页
-   - 第二次调用：输入居住区域、紧急联系人
-   - 选择报名课程
-   - 停在 `提交报名`
-7. 右侧实时显示每一步 action 和原因。
-
-### Trigger 看病挂号
-
-执行链路：
-
-1. 点击 `启动 Agent` 或用 `?autostart=1` 自动启动。
-2. Agent 点击 `开始问询`。
-3. Agent 点击演示回答。
-4. planner 输出医院、科室、时间、准备材料。
-5. 执行器填写模拟挂号页面。
-6. 停在 `确认挂号 / 支付 / 验证码` 前。
-
-## 隐私边界
-
-- 原始屏幕不上传。
-- 身份证、完整手机号、验证码、病历原文不上云。
-- planner adapter 只接收结构化脱敏摘要。
-- 高风险动作必须 `guard`，不能自动执行。
+Trigger 的云端 planner 配置放在 `config.local.json`，该文件不会提交到 GitHub。公开仓库只保留 `config.example.json`。
 
 ## 文件结构
 
 ```text
 web/
-  index.html
-  always-on-form.html
-  trigger-health.html
-  styles.css
-  agent.js
+  always-on-form.html      # 被截图的手机表单页面
+  trigger-health.html      # Trigger 挂号页面
+  agent.js                 # 展示 trace/model IO；Trigger DOM 执行器
 tools/
-  demo-server.mjs
-  always-on-workflow.py
-  verify-demo.mjs
-config.example.json
-run-always-on.ps1
-run-trigger.ps1
+  always-on-workflow.py    # Gemma LiteRT 多模态截图调用，校验坐标 JSON
+  external-always-on-runner.mjs # Playwright 截图与坐标执行
+  demo-server.mjs          # 本地 API 代理；Always-on 禁止 fallback
+run-always-on.ps1          # 真实 Always-on 截图坐标链路入口
+run-trigger.ps1            # Trigger 挂号入口
 ```
 
 ## 验证
 
 ```powershell
-node .\tools\verify-demo.mjs
+npm run verify
+$env:LAOBAI_HEADLESS = "1"
+.\run-always-on.ps1
 ```
+
+`npm run verify` 会检查 Always-on 是否拒绝旧的结构化 observation 请求，并确认 Trigger 仍可运行。`run-always-on.ps1` 会真正调用本地 Gemma E4B 多模态权重完成截图坐标链路。

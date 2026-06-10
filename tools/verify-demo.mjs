@@ -31,13 +31,14 @@ async function main() {
     stdio: ["ignore", stdout, stderr],
     detached: false,
   });
+
   try {
     await waitForServer();
-    const publicConfig = await postJson("/api/public-config", null, "GET");
+    const publicConfig = await requestJson("/api/public-config", null, "GET");
     assert(publicConfig.plannerLabel === "Gemma 4 30B Cloud Planner", "planner label mismatch");
     assert(publicConfig.edgeLabel === "Gemma 4B Computer-Use", "edge label mismatch");
 
-    const form = await postJson("/api/plan", {
+    const rejectedAlwaysOn = await requestTextExpectError("/api/plan", {
       scenario: "always-on-form",
       observation: {
         pageTitle: "北京市朝阳区社区智慧课堂报名表",
@@ -45,34 +46,12 @@ async function main() {
         visibleFields: ["姓名", "年龄段", "手机号", "下一页"],
       },
     });
-    assert(form.runtime?.keyVisibleToBrowser === false, "form runtime exposes key state incorrectly");
-    assert(form.runtime?.providerVisibleToBrowser === false, "form runtime exposes provider state incorrectly");
-    assert(form.runtime?.modelNameVisibleToBrowser === false, "form runtime exposes model state incorrectly");
-    assert(form.runtime?.plannerSkipped === true, "always-on should not call cloud planner");
-    assert(form.runtime?.workflowMode === "always-on-local-only", "always-on should use local workflow mode");
-    assert(form.source === "always-on-real-local-gemma", "always-on should use real local Gemma");
-    assert(form.runtime?.localGemmaHandoff === true, "always-on should hand off to local Gemma");
-    assertModelCall(form, 1);
-    assertAction(form, "type", "name");
-    assertAction(form, "click", "next-button");
+    assert(
+      rejectedAlwaysOn.includes("screenshot path") || rejectedAlwaysOn.includes("screenshot"),
+      "always-on structured observation request should be rejected",
+    );
 
-    const formPage2 = await postJson("/api/plan", {
-      scenario: "always-on-form",
-      observation: {
-        pageTitle: "北京市朝阳区社区智慧课堂报名表",
-        currentPage: 2,
-        visibleFields: ["居住区域", "紧急联系人", "报名课程", "学习目标", "提交报名"],
-      },
-    });
-    assert(formPage2.runtime?.plannerSkipped === true, "always-on page 2 should not call cloud planner");
-    assert(formPage2.source === "always-on-real-local-gemma", "always-on page 2 should use real local Gemma");
-    assert(formPage2.runtime?.localGemmaHandoff === true, "always-on page 2 should hand off to local Gemma");
-    assertModelCall(formPage2, 2);
-    assertAction(formPage2, "select", "course");
-    assertAction(formPage2, "type", "learning-goal");
-    assertAction(formPage2, "guard", "submit-button");
-
-    const health = await postJson("/api/plan", {
+    const health = await requestJson("/api/plan", {
       scenario: "trigger-health",
       observation: {
         userRequest: "我胃不舒服，帮我挂号",
@@ -117,20 +96,6 @@ function assertAction(plan, type, target) {
   assert(ok, `missing action ${type}:${target}`);
 }
 
-function assertModelCall(plan, page) {
-  assert(Array.isArray(plan.modelCalls) && plan.modelCalls.length === 1, `page ${page} missing model call`);
-  const call = plan.modelCalls[0];
-  assert(String(call.title || "").includes("真实本地 Gemma"), `page ${page} model title is not real Gemma`);
-  assert(String(call.input || "").includes(`Current page number: ${page}`), `page ${page} model input missing page marker`);
-  assert(String(call.input || "").includes("北京市朝阳区社区智慧课堂报名表"), `page ${page} model input missing observation`);
-  assert(String(call.output || "").includes("actions"), `page ${page} model output missing actions`);
-  assert(!hasMojibake(`${call.input}\n${call.output}`), `page ${page} model IO contains mojibake`);
-}
-
-function hasMojibake(text) {
-  return /�|鑰|濉|绔|鍖|涓|缁|妯|璇|鐢/.test(String(text || ""));
-}
-
 function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
@@ -139,7 +104,7 @@ async function waitForServer() {
   const started = Date.now();
   while (Date.now() - started < 8000) {
     try {
-      await postJson("/api/public-config", null, "GET");
+      await requestJson("/api/public-config", null, "GET");
       return;
     } catch {
       await new Promise((resolve) => setTimeout(resolve, 250));
@@ -148,11 +113,27 @@ async function waitForServer() {
   throw new Error("server did not start");
 }
 
-function postJson(path, body, method = "POST") {
+function requestJson(pathname, body, method = "POST") {
+  return request(pathname, body, method).then(({ statusCode, text }) => {
+    if (statusCode < 200 || statusCode > 299) {
+      throw new Error(`HTTP ${statusCode}: ${text}`);
+    }
+    return JSON.parse(text);
+  });
+}
+
+function requestTextExpectError(pathname, body) {
+  return request(pathname, body, "POST").then(({ statusCode, text }) => {
+    if (statusCode >= 400) return text;
+    throw new Error(`expected HTTP error but got ${statusCode}: ${text}`);
+  });
+}
+
+function request(pathname, body, method = "POST") {
   return new Promise((resolve, reject) => {
     const data = body == null ? "" : JSON.stringify(body);
     const req = http.request(
-      `${base}${path}`,
+      `${base}${pathname}`,
       {
         method,
         headers: {
@@ -164,12 +145,10 @@ function postJson(path, body, method = "POST") {
         const chunks = [];
         res.on("data", (chunk) => chunks.push(chunk));
         res.on("end", () => {
-          const text = Buffer.concat(chunks).toString("utf8");
-          if (res.statusCode < 200 || res.statusCode > 299) {
-            reject(new Error(`HTTP ${res.statusCode}: ${text}`));
-            return;
-          }
-          resolve(JSON.parse(text));
+          resolve({
+            statusCode: res.statusCode || 0,
+            text: Buffer.concat(chunks).toString("utf8"),
+          });
         });
       },
     );

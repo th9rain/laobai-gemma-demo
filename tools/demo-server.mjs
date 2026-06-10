@@ -110,10 +110,10 @@ function effectiveEdgeModel(configData) {
 }
 
 async function plannerRequest(payload) {
-  const fallback = fallbackPlan(payload);
   if (payload?.scenario === "always-on-form") {
     return alwaysOnLocalWorkflowRequest(payload);
   }
+  const fallback = triggerFallbackPlan(payload);
   const cloudPlan = await cloudPlannerRequest(payload, fallback);
   return edgeComputerUseRequest(payload, cloudPlan);
 }
@@ -132,13 +132,28 @@ async function alwaysOnLocalWorkflowRequest(payload) {
     throw new Error(`Always-on real Gemma dependency missing: ${error?.message || error}`);
   }
 
-  const observationPath = path.join(os.tmpdir(), `laobai-always-on-observation-${Date.now()}-${Math.random().toString(16).slice(2)}.json`);
-  await fs.writeFile(observationPath, JSON.stringify(payload?.observation || {}, null, 2), "utf8");
+  const screenshot = payload?.screenshot || {};
+  const screenshotPath = path.resolve(rootDir, String(screenshot.path || payload?.screenshotPath || ""));
+  const pageNumber = Number(payload?.page || screenshot.page || 1);
+  const width = Number(screenshot.width || payload?.width || 0);
+  const height = Number(screenshot.height || payload?.height || 0);
+  if (!screenshotPath || !width || !height) {
+    throw new Error("Always-on computer-use requires a screenshot path, width, and height. Structured observation fallback is disabled.");
+  }
+  try {
+    await fs.access(screenshotPath);
+  } catch (error) {
+    throw new Error(`Always-on screenshot is not readable: ${error?.message || error}`);
+  }
+
   try {
     const result = await runAlwaysOnWorkflowProcess({
       pythonPath,
       modelPath,
-      observationPath,
+      screenshotPath,
+      pageNumber,
+      width,
+      height,
       timeoutMs: Number(process.env.LAOBAI_LOCAL_GEMMA_TIMEOUT_MS || 180000),
     });
     if (!result.ok || !result.plan) {
@@ -148,11 +163,13 @@ async function alwaysOnLocalWorkflowRequest(payload) {
     return withRuntime({
       ...normalized,
       modelCalls: [{
-        title: `Always-on 真实本地 Gemma 调用 / 第 ${payload?.observation?.currentPage || 1} 页`,
+        title: `Always-on 真实本地 Gemma 截图坐标调用 / 第 ${pageNumber} 页`,
         input: result.modelInput || "",
         output: result.modelOutput || "",
+        screenshotDataUrl: result.screenshotDataUrl || "",
+        parsedActions: normalized.actions,
       }],
-      note: "Always-on action plan produced by the local Gemma LiteRT weight.",
+      note: "Always-on action plan produced by local Gemma LiteRT from a screenshot.",
     }, alwaysOnRuntimePatch({
       localGemmaConfigured: true,
       localGemmaHandoff: true,
@@ -164,10 +181,32 @@ async function alwaysOnLocalWorkflowRequest(payload) {
       errorName: String(error?.name || "Error"),
       errorMessage: sanitizeDebugMessage(error?.message || error),
     });
+    if (error?.workflowResult) {
+      return sendAlwaysOnFailure(error.workflowResult, error);
+    }
     throw error;
-  } finally {
-    fs.unlink(observationPath).catch(() => {});
   }
+}
+
+function sendAlwaysOnFailure(result, error) {
+  return withRuntime({
+    ok: false,
+    source: "always-on-real-local-gemma-vision",
+    summary: "本地 Gemma 截图调用已返回，但没有通过坐标动作校验。",
+    error: String(result?.error || error?.message || error),
+    actions: [],
+    modelCalls: [{
+      title: "Always-on 真实本地 Gemma 截图坐标调用失败",
+      input: result?.modelInput || "",
+      output: result?.modelOutput || "",
+      screenshotDataUrl: result?.screenshotDataUrl || "",
+      parsedActions: [],
+    }],
+  }, alwaysOnRuntimePatch({
+    localGemmaConfigured: true,
+    localGemmaHandoff: false,
+    localGemmaStatus: "model-output-invalid",
+  }));
 }
 
 function normalizeAlwaysOnPlan(plan) {
@@ -175,18 +214,20 @@ function normalizeAlwaysOnPlan(plan) {
   const safeActions = actions
     .map((action) => ({
       type: String(action.type || ""),
-      target: String(action.target || ""),
-      value: action.value == null ? "" : String(action.value),
+      x: Number(action.x),
+      y: Number(action.y),
+      text: action.text == null ? "" : String(action.text),
+      label: action.label == null ? "" : String(action.label),
       reason: String(action.reason || "local Gemma action"),
     }))
-    .filter((action) => isSafeAction(action));
+    .filter((action) => isSafeCoordinateAction(action));
   if (safeActions.length === 0) {
     throw new Error("Always-on real Gemma returned no safe actions.");
   }
   return {
     ok: true,
-    source: "always-on-real-local-gemma",
-    summary: readableModelText(plan.summary) ? String(plan.summary) : "本地 Gemma 已生成 Always-on GUI 动作。",
+    source: "always-on-real-local-gemma-vision",
+    summary: readableModelText(plan.summary) ? String(plan.summary) : "本地 Gemma 已根据截图生成 Always-on 坐标动作。",
     actions: safeActions,
   };
 }
@@ -205,12 +246,15 @@ function alwaysOnRuntimePatch(extra = {}) {
   };
 }
 
-function runAlwaysOnWorkflowProcess({ pythonPath, modelPath, observationPath, timeoutMs }) {
+function runAlwaysOnWorkflowProcess({ pythonPath, modelPath, screenshotPath, pageNumber, width, height, timeoutMs }) {
   return new Promise((resolve, reject) => {
     const child = spawn(pythonPath, [
       path.join(rootDir, "tools", "always-on-workflow.py"),
       "--model", modelPath,
-      "--observation-file", observationPath,
+      "--screenshot", screenshotPath,
+      "--page", String(pageNumber),
+      "--width", String(width),
+      "--height", String(height),
     ], {
       cwd: rootDir,
       env: pythonUtf8Env(),
@@ -239,12 +283,28 @@ function runAlwaysOnWorkflowProcess({ pythonPath, modelPath, observationPath, ti
           resolve(parsed);
           return;
         }
-        reject(new Error(parsed.error || parsed.text || err || `Always-on workflow exited with ${code}`));
+        const error = new Error(parsed.error || parsed.text || err || `Always-on workflow exited with ${code}`);
+        error.workflowResult = parsed;
+        reject(error);
       } catch {
         reject(new Error(err || text || `Always-on workflow exited with ${code}`));
       }
     });
   });
+}
+
+function isSafeCoordinateAction(action) {
+  const allowedTypes = new Set(["type_at", "click", "guard", "wait"]);
+  if (!allowedTypes.has(action.type)) return false;
+  if (action.type === "wait") return true;
+  if (!Number.isFinite(action.x) || !Number.isFinite(action.y)) return false;
+  const highRiskTargets = ["submit", "confirm", "payment", "otp", "delete", "authorize", "提交", "确认", "支付", "验证码", "删除", "授权"];
+  const combined = `${action.label || ""} ${action.text || ""} ${action.reason || ""}`.toLowerCase();
+  if (action.type !== "guard" && highRiskTargets.some((item) => combined.includes(item.toLowerCase())) && !combined.includes("下一页")) {
+    return false;
+  }
+  if (action.type === "type_at" && !String(action.text || "").trim()) return false;
+  return true;
 }
 
 async function cloudPlannerRequest(payload, fallback) {
@@ -280,7 +340,7 @@ async function cloudPlannerRequest(payload, fallback) {
 }
 
 async function edgeComputerUseRequest(payload, cloudPlan) {
-  if (config.localGemmaEnabled) {
+  if (payload?.scenario !== "trigger-health" && config.localGemmaEnabled) {
     const localPlan = await localGemmaComputerUseRequest(payload, cloudPlan);
     if (localPlan.source === "local-gemma-computer-use") {
       return localPlan;
@@ -645,7 +705,7 @@ function parseJsonObject(text) {
   }
 }
 
-function fallbackPlan(payload) {
+function triggerFallbackPlan(payload) {
   if (payload?.scenario === "trigger-health") {
     return {
       ok: true,
@@ -663,30 +723,11 @@ function fallbackPlan(payload) {
     };
   }
   return {
-    ok: true,
-    source: "edge-policy",
-    summary: "端侧 Computer-Use 策略识别报名表，并停在提交前。",
-    actions: alwaysOnFallbackActions(payload),
+    ok: false,
+    source: "unsupported-scenario",
+    summary: "未知 demo 场景；没有启用静态动作。",
+    actions: [],
   };
-}
-
-function alwaysOnFallbackActions(payload) {
-  const page = Number(payload?.observation?.currentPage || 1);
-  if (page === 2) {
-    return [
-      { type: "type", target: "area", value: "北京市朝阳区望京街道", reason: "填写居住区域" },
-      { type: "type", target: "contact", value: "女儿 王敏", reason: "填写紧急联系人" },
-      { type: "select", target: "course", value: "智能手机基础课", reason: "选择偏好课程" },
-      { type: "type", target: "learning-goal", value: "想学会微信视频、线上挂号和识别诈骗短信。", reason: "填写学习目标" },
-      { type: "guard", target: "submit-button", reason: "提交报名属于高风险动作，必须停住" },
-    ];
-  }
-  return [
-    { type: "type", target: "name", value: "李桂兰", reason: "填写本地记忆中的姓名" },
-    { type: "type", target: "age", value: "70s", reason: "填写年龄段" },
-    { type: "type", target: "phone", value: "138****2675", reason: "只填写脱敏手机号" },
-    { type: "click", target: "next-button", reason: "第一页填写完成，进入第二页继续观察" },
-  ];
 }
 
 function isSafeAction(action) {

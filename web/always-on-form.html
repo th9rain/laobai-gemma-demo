@@ -3,13 +3,13 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>老白 Agent - Always-on 自动填表</title>
+    <title>老白 Agent - Always-on 截图坐标填表</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
     <main class="page">
       <section class="phone" aria-label="模拟手机">
-        <div class="screen">
+        <div class="screen" data-phone-screen>
           <div class="status-bar">
             <span>09:41</span>
             <span>5G 88%</span>
@@ -19,24 +19,25 @@
             <p class="app-subtitle">北京市朝阳区 · 老年数字服务</p>
           </div>
           <div class="screen-wrap">
-            <div class="app-content">
+            <div class="app-content" data-computer-use-surface>
+              <div class="coordinate-grid-overlay" aria-hidden="true"></div>
               <div class="notice">
-                页面识别：北京市朝阳区社区智慧课堂报名表。老白会先填写第一页，翻页后再次观察第二页，提交前会停住。
+                这是北京市朝阳区社区智慧课堂报名表。老白会先截图识别第 1 页，按坐标填写并翻页；翻页后再次截图识别第 2 页，提交前必须停住。
               </div>
 
               <div id="form-page-1" data-form-page="1">
                 <div class="notice step-notice">第 1 页 / 共 2 页：基础信息</div>
                 <div class="field">
                   <label for="name">姓名</label>
-                  <input id="name" autocomplete="off" />
+                  <input id="name" placeholder="请填写姓名" autocomplete="off" />
                 </div>
                 <div class="field">
                   <label for="age">年龄段</label>
-                  <input id="age" autocomplete="off" />
+                  <input id="age" placeholder="请填写年龄段" autocomplete="off" />
                 </div>
                 <div class="field">
                   <label for="phone">手机号</label>
-                  <input id="phone" autocomplete="off" />
+                  <input id="phone" placeholder="请填写手机号" autocomplete="off" />
                 </div>
                 <button id="next-button" class="primary-btn" type="button">下一页</button>
               </div>
@@ -45,29 +46,29 @@
                 <div class="notice step-notice">第 2 页 / 共 2 页：课程与联系人</div>
                 <div class="field">
                   <label for="area">居住区域</label>
-                  <input id="area" autocomplete="off" />
+                  <input id="area" placeholder="请填写居住区域" autocomplete="off" />
                 </div>
                 <div class="field">
                   <label for="contact">紧急联系人</label>
-                  <input id="contact" autocomplete="off" />
+                  <input id="contact" placeholder="请填写紧急联系人" autocomplete="off" />
                 </div>
                 <div class="field">
                   <label for="course">报名课程</label>
-                  <select id="course">
-                    <option value="">请选择</option>
-                    <option>智能手机基础课</option>
-                    <option>防诈骗安全课</option>
-                    <option>线上挂号与缴费课</option>
-                  </select>
+                  <input id="course" list="course-list" placeholder="请填写报名课程" autocomplete="off" />
+                  <datalist id="course-list">
+                    <option value="智能手机基础课"></option>
+                    <option value="防诈骗安全课"></option>
+                    <option value="线上挂号与缴费课"></option>
+                  </datalist>
                 </div>
                 <div class="field">
                   <label for="learning-goal">学习目标</label>
-                  <textarea id="learning-goal" autocomplete="off"></textarea>
+                  <textarea id="learning-goal" placeholder="请填写学习目标" autocomplete="off"></textarea>
                 </div>
 
-                <button id="submit-button" class="danger-btn">提交报名</button>
+                <button id="submit-button" class="danger-btn" type="button">提交报名</button>
                 <div class="notice danger">
-                  安全策略：提交报名属于高风险动作，Agent 不会自动点击。
+                  安全策略：提交报名属于高风险动作，Agent 只能标记 guard，不能自动点击。
                 </div>
               </div>
             </div>
@@ -77,28 +78,28 @@
       </section>
 
       <section class="operator">
-        <h1>Always-on 自动填表</h1>
+        <h1>Always-on 截图坐标填表</h1>
         <p>
-          这个页面模拟老人打开报名表后，端侧 Gemma 4B/E4B LiteRT 权重根据当前页面 observation 生成 GUI action。执行器会按模型输出真实操作左侧手机界面里的控件。
+          这个页面只用于承载真实 computer-use 测试：外部 Playwright 脚本截图，端侧 Gemma LiteRT 模型根据截图输出坐标 JSON，脚本再按坐标点击和输入。这里不再使用 DOM id 或结构化 observation 生成动作。
         </p>
         <div class="operator-panel">
           <div class="model-row">
             <div>
-              <strong data-edge-label>Gemma 4B Computer-Use</strong>
-              <span>屏幕观察、控件定位、低风险输入执行。</span>
+              <strong data-edge-label>Gemma 4B/E4B Computer-Use</strong>
+              <span>输入：屏幕截图 + 任务；输出：坐标动作 JSON。</span>
             </div>
             <div class="pill">on-device</div>
           </div>
           <div class="model-row">
             <div>
               <strong data-planner-label>真实本地 Gemma 权重</strong>
-              <span>Always-on 不请求云端 Planner；缺少本地权重或模型调用失败时直接停止。</span>
+              <span>Always-on 不请求云端 planner；如果截图视觉调用失败，本轮直接失败。</span>
             </div>
-            <div class="pill" data-planner-badge>checking</div>
+            <div class="pill" data-planner-badge>not used</div>
           </div>
           <div class="controls">
-            <button class="primary-btn" data-start>启动 Agent</button>
-            <button class="secondary-btn" data-reset>重置页面</button>
+            <button class="primary-btn" data-start type="button">等待外部坐标 Runner</button>
+            <button class="secondary-btn" data-reset type="button">重置页面</button>
             <a class="secondary-btn" href="./trigger-health.html" style="text-decoration:none; display:inline-grid; place-items:center;">切到 Trigger 挂号</a>
           </div>
           <div class="trace" data-trace></div>
@@ -114,61 +115,18 @@
         document.getElementById("form-page-2").hidden = false;
       });
 
-      window.observeAlwaysOnForm = function observeAlwaysOnForm() {
-        const page = document.getElementById("form-page-2").hidden ? 1 : 2;
-        return {
-          device: "mobile-portrait-sim",
-          pageTitle: "北京市朝阳区社区智慧课堂报名表",
-          currentPage: page,
-          visibleFields: page === 1
-            ? ["姓名", "年龄段", "手机号", "下一页"]
-            : ["居住区域", "紧急联系人", "报名课程", "学习目标", "提交报名"],
-          privacy: {
-            rawScreenUploaded: false,
-            redaction: "strict",
-            sensitiveFields: page === 1 ? ["phone"] : [],
-          },
-          goal: page === 1
-            ? "填写第一页基础信息，然后点击下一页。"
-            : "填写第二页课程信息，并停在提交报名按钮前。",
-        };
+      document.querySelector("[data-reset]").addEventListener("click", () => window.location.reload());
+
+      window.renderExternalEvent = function renderExternalEvent(event) {
+        window.addAgentTrace?.(event.title, event.detail, event.guard);
       };
 
       window.renderExternalModelCall = function renderExternalModelCall(call) {
-        const modelIo = document.querySelector("[data-model-io]");
-        if (!modelIo) return;
-        const item = document.createElement("details");
-        item.className = "model-call";
-        item.open = true;
-        item.innerHTML = `
-          <summary>${escapeHtml(call.title || "外部 Agent 本地 Gemma 调用")}</summary>
-          <div class="model-call-block">
-            <div class="model-call-label">模型输入 Prompt</div>
-            <pre>${escapeHtml(call.input || "")}</pre>
-          </div>
-          <div class="model-call-block">
-            <div class="model-call-label">模型原始输出</div>
-            <pre>${escapeHtml(call.output || "")}</pre>
-          </div>
-        `;
-        modelIo.appendChild(item);
+        window.renderModelCall?.(call);
       };
 
-      function escapeHtml(value) {
-        return String(value).replace(/[&<>"']/g, (char) => ({
-          "&": "&amp;",
-          "<": "&lt;",
-          ">": "&gt;",
-          '"': "&quot;",
-          "'": "&#039;",
-        }[char]));
-      }
-
       if (new URLSearchParams(window.location.search).get("external") !== "1") {
-        window.bootAgent({
-          scenario: "always-on-form",
-          observe: window.observeAlwaysOnForm,
-        });
+        window.bootPassiveAlwaysOnPage?.();
       }
     </script>
   </body>

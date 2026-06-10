@@ -16,7 +16,7 @@
 ```powershell
 .\tools\download-gemma-model.ps1
 .\tools\setup-litert-lm.ps1
-.\run-always-on-demo.ps1
+.\run-always-on.ps1
 ```
 
 这个入口会忽略 `config.local.json`，不会读取云端 planner endpoint 或 key。它只使用本地 `models/gemma-4-E4B-it.litertlm` 和 `.venv/Scripts/python.exe`。如果权重、Python 环境或模型输出不可用，Always-on 会直接失败，不会静态兜底填表。
@@ -26,7 +26,7 @@
 ```powershell
 npm install
 npx playwright install chromium
-.\run-external-always-on.ps1
+.\tools\run-external-always-on.ps1
 ```
 
 这个入口会启动本地 server，然后用外部 Playwright 脚本读取页面 observation，请求本地 Gemma 权重生成 action，再由脚本从页面外部执行 `fill/select/click`。它不是页面 JS 自己填自己。
@@ -35,25 +35,18 @@ npx playwright install chromium
 也可以不打开网页，直接在命令行跑本地 workflow：
 
 ```powershell
-.\run-always-on-workflow.ps1
+.\tools\run-always-on-workflow.ps1
 ```
 
 它会输出本地 Gemma 解析后的 action JSON，可用于检查真实权重是否能返回可执行动作。
 
-运行完整 Web Demo：
+运行 Trigger 看病挂号：
 
 ```powershell
-.\run-demo-server.ps1
+.\run-trigger.ps1
 ```
 
-打开首页后选择任一 demo。
-
-也可以直接启动指定 demo：
-
-```powershell
-.\run-always-on-demo.ps1
-.\run-trigger-demo.ps1
-```
+根目录只保留两个入口：`run-always-on.ps1` 和 `run-trigger.ps1`。
 
 Always-on 不能直接双击 HTML 运行，必须通过本地 server 调用真实 Gemma 权重。Trigger 页面在没有云端配置时仍保留本地安全 fallback，保证挂号流程可展示。
 
@@ -151,10 +144,8 @@ tools/
   always-on-workflow.py
   verify-demo.mjs
 config.example.json
-run-demo-server.ps1
-run-always-on-demo.ps1
-run-always-on-workflow.ps1
-run-trigger-demo.ps1
+run-always-on.ps1
+run-trigger.ps1
 ```
 
 ## 验证

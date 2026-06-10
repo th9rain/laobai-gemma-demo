@@ -21,10 +21,10 @@ HTML 手机模拟页
     -> 实时写入执行轨迹
 ```
 
-Always-on 离线入口：
+Always-on 真实本地权重入口：
 
 ```text
-run-always-on-demo.ps1
+run-always-on.ps1
   -> 忽略 config.local.json
   -> 清空云端 planner / edge 环境变量
   -> 启用 LAOBAI_LOCAL_GEMMA_ENABLED=1
@@ -36,7 +36,7 @@ run-always-on-demo.ps1
 Always-on 外部执行器入口：
 
 ```text
-run-external-always-on.ps1
+tools/run-external-always-on.ps1
   -> 启动本地 server，但不打开浏览器
   -> tools/external-always-on-runner.mjs 打开 always-on-form.html?external=1
   -> Playwright 在页面外部读取 observeAlwaysOnForm()
@@ -48,7 +48,7 @@ run-external-always-on.ps1
 命令行 workflow 验证入口：
 
 ```text
-run-always-on-workflow.ps1
+tools/run-always-on-workflow.ps1
   -> 使用 tools/always-on-workflow.py 内置固定表单 observation
   -> 调用 tools/always-on-workflow.py
   -> 输出本地 action JSON
@@ -103,11 +103,11 @@ Trigger 分支才会先调用云端 planner，再调用本地 Gemma 生成/校�
 
 链路：
 
-- `run-always-on-demo.ps1` 显式关闭云端配置，只启用本地 Gemma
+- `run-always-on.ps1` 显式关闭云端配置，只启用本地 Gemma
 - 第 1 页 observation 识别基础信息表单
 - `/api/plan` 进入 `always-on-local-only` 分支
 - `tools/always-on-workflow.py` 调用本地 Gemma LiteRT 权重，并返回 `modelInput` / `modelOutput`
-- Python 脚本解析模型输出，并用固定 workflow 模板校验字段和值
+- Python 脚本解析模型输出，要求模型返回完整 JSON action plan；缺字段或输出非法时直接失败
 - 执行器填写第一页并点击 `下一页`
 - 第 2 页重新 observation，再次调用本地 Gemma
 - 执行器填写第二页，并用 `guard` 停在提交前
@@ -149,4 +149,4 @@ Trigger 分支才会先调用云端 planner，再调用本地 Gemma 生成/校�
 
 - 只允许 `click/type/select/wait/guard`
 - 如果目标包含 `submit/confirm/payment/otp/delete/authorize`，非 `guard` 动作会被丢弃
-- planner 不可用时使用 deterministic fallback，保证演示稳定
+- Trigger planner 不可用时使用 deterministic fallback，保证挂号演示稳定；Always-on 不使用静态 fallback

@@ -6,7 +6,7 @@
 2. 只录 Always-on 真实本地 Gemma 权重版本时运行：
 
 ```powershell
-.\run-always-on-demo.ps1
+.\run-always-on.ps1
 ```
 
 3. 如果想演示“外部脚本读取模型输出后真实操作网页控件”，运行：
@@ -14,18 +14,18 @@
 ```powershell
 npm install
 npx playwright install chromium
-.\run-external-always-on.ps1
+.\tools\run-external-always-on.ps1
 ```
 
 这个脚本默认打开可见浏览器窗口，适合录屏。只做后台验证时，可以先设置 `$env:LAOBAI_HEADLESS="1"`。
 
-4. 录完整 demo 时运行：
+4. 录 Trigger 看病挂号时运行：
 
 ```powershell
-.\run-demo-server.ps1
+.\run-trigger.ps1
 ```
 
-5. 浏览器打开首页后开始录屏。
+5. 浏览器打开页面后开始录屏。
 
 Always-on 必须通过本地 server 调用真实 Gemma 权重，不能直接双击 HTML 文件运行。Trigger 页面在没有云端配置时仍保留本地安全 fallback。
 

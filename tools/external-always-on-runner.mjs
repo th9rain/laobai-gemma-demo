@@ -10,11 +10,16 @@ await fs.mkdir(runDir, { recursive: true });
 const browser = await chromium.launch({
   headless: process.env.LAOBAI_HEADLESS !== "0",
 });
-const page = await browser.newPage({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 1 });
+const page = await browser.newPage({ viewport: { width: 1280, height: 1000 }, deviceScaleFactor: 1 });
 
 try {
   await page.goto(`${baseUrl}/always-on-form.html?external=1`, { waitUntil: "domcontentloaded" });
   await page.waitForSelector("[data-computer-use-surface]");
+  await page.evaluate(() => {
+    window.drawCoordinateGrid?.();
+    window.updateRunStatus?.("running");
+    window.updateIoStatus?.("0 calls");
+  });
 
   const modelCalls = [];
   for (let pass = 1; pass <= 3; pass += 1) {
@@ -38,7 +43,7 @@ try {
       await page.evaluate((item) => window.renderExternalModelCall?.(item), call);
     }
 
-    const phoneBox = await getPhoneBox();
+    const phoneBox = await getPhoneBoxInViewport();
     await fs.writeFile(path.join(runDir, `always-on-pass-${pass}-geometry.json`), JSON.stringify({
       screenshot,
       phoneBox: {
@@ -50,7 +55,7 @@ try {
     }, null, 2), "utf8");
     let shouldContinue = false;
     for (const action of plan.actions || []) {
-      const execution = await executeCoordinateAction(action, phoneBox, screenshot);
+      const execution = await executeCoordinateAction(action, screenshot);
       await appendJsonl(path.join(runDir, `always-on-pass-${pass}-execution.jsonl`), execution);
       if (action.type === "click" && String(action.label || "").includes("下一页")) {
         await page.waitForTimeout(700);
@@ -87,16 +92,27 @@ try {
   console.log(JSON.stringify({
     ok: true,
     runDir,
+    finalScreenshot: path.join(runDir, "always-on-final-page.png"),
     modelCallCount: modelCalls.length,
     ioAudit,
     state,
   }, null, 2));
+  await page.evaluate(() => {
+    window.updateRunStatus?.("guarded");
+  });
+  await page.screenshot({
+    path: path.join(runDir, "always-on-final-page.png"),
+    fullPage: true,
+  });
+  await page.waitForTimeout(process.env.LAOBAI_HEADLESS === "0" ? 3000 : 250);
 } finally {
   await browser.close();
 }
 
 async function capturePhoneScreenshot(currentPage, pass) {
   const locator = page.locator("[data-computer-use-surface]");
+  await locator.scrollIntoViewIfNeeded();
+  await page.waitForTimeout(120);
   const box = await locator.boundingBox();
   if (!box) throw new Error("phone screen box not found");
   const screenshotPath = path.join(runDir, `always-on-pass-${pass}-page-${currentPage}.png`);
@@ -115,6 +131,8 @@ async function capturePhoneScreenshot(currentPage, pass) {
     page: currentPage,
     width: Math.round(box.width),
     height: Math.round(box.height),
+    scrollX: await page.evaluate(() => window.scrollX),
+    scrollY: await page.evaluate(() => window.scrollY),
   };
 }
 
@@ -146,7 +164,7 @@ async function requestPlan(payload) {
   return plan;
 }
 
-async function executeCoordinateAction(action, phoneBox, screenshot) {
+async function executeCoordinateAction(action, screenshot) {
   await page.evaluate((event) => window.renderExternalEvent?.(event), {
     title: actionTitle(action),
     detail: action.reason || `${action.x},${action.y}`,
@@ -157,10 +175,15 @@ async function executeCoordinateAction(action, phoneBox, screenshot) {
     await page.waitForTimeout(Number(action.ms || 600));
     return;
   }
+  const phoneBox = await getPhoneBoxInViewport();
   const scaleX = phoneBox.width / Number(screenshot.width || phoneBox.width);
   const scaleY = phoneBox.height / Number(screenshot.height || phoneBox.height);
   const x = phoneBox.x + Number(action.x) * scaleX;
   const y = phoneBox.y + Number(action.y) * scaleY;
+  const viewport = page.viewportSize();
+  if (viewport && (x < 0 || y < 0 || x > viewport.width || y > viewport.height)) {
+    throw new Error(`Coordinate outside viewport: (${x}, ${y}) in ${viewport.width}x${viewport.height}.`);
+  }
   const before = await inspectPoint(x, y);
   await showPointer(x, y, action.type === "guard");
 
@@ -193,6 +216,17 @@ async function executeCoordinateAction(action, phoneBox, screenshot) {
     return { action, pageX: x, pageY: y, before, after: await inspectPoint(x, y), currentPage: await getCurrentFormPage() };
   }
   return { action, pageX: x, pageY: y, before, after: await inspectPoint(x, y), currentPage: await getCurrentFormPage() };
+}
+
+async function resetScrollForCoordinateExecution(screenshot = {}) {
+  await page.evaluate(({ scrollX = 0, scrollY = 0 }) => {
+    window.scrollTo(scrollX, scrollY);
+    const active = document.activeElement;
+    if (active && typeof active.blur === "function") active.blur();
+  }, {
+    scrollX: Number(screenshot.scrollX || 0),
+    scrollY: Number(screenshot.scrollY || 0),
+  });
 }
 
 async function inspectPoint(x, y) {
@@ -253,6 +287,15 @@ async function showPointer(x, y, danger = false) {
 
 async function getPhoneBox() {
   const box = await page.locator("[data-computer-use-surface]").boundingBox();
+  if (!box) throw new Error("computer-use surface box not found");
+  return box;
+}
+
+async function getPhoneBoxInViewport() {
+  const locator = page.locator("[data-computer-use-surface]");
+  await locator.scrollIntoViewIfNeeded();
+  await page.waitForTimeout(80);
+  const box = await locator.boundingBox();
   if (!box) throw new Error("computer-use surface box not found");
   return box;
 }

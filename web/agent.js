@@ -6,6 +6,8 @@ let modelCallCount = 0;
 window.addAgentTrace = function addAgentTrace(title, detail, guard = false) {
   traceStep += 1;
   const trace = document.querySelector("[data-trace]");
+  trace?.classList.remove("empty");
+  updateRunStatus(guard ? "guard" : "running");
   const item = document.createElement("div");
   item.className = `trace-item${guard ? " guard" : ""}`;
   item.innerHTML = `
@@ -23,30 +25,45 @@ window.renderModelCall = function renderModelCall(call = {}) {
   const modelIo = document.querySelector("[data-model-io]");
   if (!modelIo) return;
   modelCallCount += 1;
+  modelIo.classList.remove("empty");
+  modelIo.querySelector(".empty-state")?.remove();
+  updateIoStatus(`${modelCallCount} call${modelCallCount > 1 ? "s" : ""}`);
   const item = document.createElement("details");
   item.className = "model-call";
   item.open = true;
+  const rawPayload = buildModelPayloadPreview(call);
+  const meta = buildModelMeta(call);
   const screenshot = call.screenshotDataUrl
     ? `<div class="model-call-block">
-        <div class="model-call-label">模型输入截图</div>
-        <img class="model-screenshot" src="${escapeHtml(call.screenshotDataUrl)}" alt="Gemma screenshot input" />
+        <div class="model-call-label">1. 图片输入</div>
+        <div class="screenshot-row">
+          <img class="model-screenshot" src="${escapeHtml(call.screenshotDataUrl)}" alt="Gemma screenshot input" />
+          <pre>${escapeHtml(meta)}</pre>
+        </div>
       </div>`
     : "";
   const parsed = call.parsedActions
     ? `<div class="model-call-block">
-        <div class="model-call-label">解析后的坐标动作</div>
+        <div class="model-call-label">5. 解析后的坐标动作 JSON</div>
         <pre>${escapeHtml(JSON.stringify(call.parsedActions, null, 2))}</pre>
       </div>`
     : "";
   item.innerHTML = `
-    <summary>${escapeHtml(call.title || `本地 Gemma 调用 ${modelCallCount}`)}</summary>
+    <summary>
+      <span>${escapeHtml(call.title || `本地 Gemma 调用 ${modelCallCount}`)}</span>
+      <em>${escapeHtml(call.elapsedMs ? `${call.elapsedMs}ms` : "raw io")}</em>
+    </summary>
     ${screenshot}
     <div class="model-call-block">
-      <div class="model-call-label">模型输入 Prompt</div>
+      <div class="model-call-label">2. 原始输入 payload 摘要</div>
+      <pre>${escapeHtml(rawPayload)}</pre>
+    </div>
+    <div class="model-call-block">
+      <div class="model-call-label">3. 模型输入 Prompt 原文</div>
       <pre>${escapeHtml(call.input || "")}</pre>
     </div>
     <div class="model-call-block">
-      <div class="model-call-label">模型原始输出</div>
+      <div class="model-call-label">4. 模型原始输出</div>
       <pre>${escapeHtml(call.output || "")}</pre>
     </div>
     ${parsed}
@@ -57,6 +74,8 @@ window.renderModelCall = function renderModelCall(call = {}) {
 
 window.bootPassiveAlwaysOnPage = async function bootPassiveAlwaysOnPage() {
   drawCoordinateGrid();
+  updateRunStatus("waiting");
+  updateIoStatus("0 calls");
   const startButton = document.querySelector("[data-start]");
   startButton?.addEventListener("click", () => {
     window.addAgentTrace(
@@ -72,7 +91,50 @@ window.bootPassiveAlwaysOnPage = async function bootPassiveAlwaysOnPage() {
   );
 };
 
-function drawCoordinateGrid() {
+function buildModelMeta(call = {}) {
+  const payload = call.rawInput || {};
+  const image = payload.image || {};
+  return JSON.stringify({
+    page: payload.page || call.page || null,
+    imageType: image.type || "input_image",
+    screenshotPath: image.path || call.screenshotPath || "[local temp png]",
+    width: image.width || call.width || null,
+    height: image.height || call.height || null,
+    modelInputMode: "image + text",
+  }, null, 2);
+}
+
+function buildModelPayloadPreview(call = {}) {
+  if (call.rawInput) return JSON.stringify(call.rawInput, null, 2);
+  return JSON.stringify({
+    role: "user",
+    content: [
+      {
+        type: "input_image",
+        image_ref: call.screenshotPath || "[local screenshot path]",
+      },
+      {
+        type: "input_text",
+        text: call.input || "",
+      },
+    ],
+  }, null, 2);
+}
+
+function updateRunStatus(text) {
+  const node = document.querySelector("[data-run-status]");
+  if (node) node.textContent = text;
+}
+
+function updateIoStatus(text) {
+  const node = document.querySelector("[data-io-status]");
+  if (node) node.textContent = text;
+}
+
+window.updateRunStatus = updateRunStatus;
+window.updateIoStatus = updateIoStatus;
+
+window.drawCoordinateGrid = function drawCoordinateGrid() {
   const overlay = document.querySelector(".coordinate-grid-overlay");
   const screen = document.querySelector("[data-computer-use-surface]");
   if (!overlay || !screen) return;
@@ -103,7 +165,7 @@ function drawCoordinateGrid() {
     label.textContent = `y${y}`;
     overlay.appendChild(label);
   }
-}
+};
 
 window.bootAgent = async function bootAgent(options) {
   const state = {

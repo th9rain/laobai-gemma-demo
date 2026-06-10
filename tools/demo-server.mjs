@@ -164,9 +164,32 @@ async function alwaysOnLocalWorkflowRequest(payload) {
       ...normalized,
       modelCalls: [{
         title: `Always-on 真实本地 Gemma 截图坐标调用 / 第 ${pageNumber} 页`,
+        page: pageNumber,
+        width,
+        height,
+        elapsedMs: result.elapsedMs || 0,
+        screenshotPath: result.screenshotPath || screenshotPath,
         input: result.modelInput || "",
         output: result.modelOutput || "",
         screenshotDataUrl: result.screenshotDataUrl || "",
+        rawInput: {
+          role: "user",
+          content: [
+            {
+              type: "input_image",
+              image_ref: "local-temp-screenshot",
+              path: result.screenshotPath || screenshotPath,
+              width,
+              height,
+            },
+            {
+              type: "input_text",
+              text: result.modelInput || "",
+            },
+          ],
+          page: pageNumber,
+          modelInputMode: "image + text",
+        },
         parsedActions: normalized.actions,
       }],
       note: "Always-on action plan produced by local Gemma LiteRT from a screenshot.",
@@ -197,9 +220,26 @@ function sendAlwaysOnFailure(result, error) {
     actions: [],
     modelCalls: [{
       title: "Always-on 真实本地 Gemma 截图坐标调用失败",
+      page: result?.page || null,
       input: result?.modelInput || "",
       output: result?.modelOutput || "",
       screenshotDataUrl: result?.screenshotDataUrl || "",
+      screenshotPath: result?.screenshotPath || "",
+      rawInput: {
+        role: "user",
+        content: [
+          {
+            type: "input_image",
+            image_ref: "local-temp-screenshot",
+            path: result?.screenshotPath || "",
+          },
+          {
+            type: "input_text",
+            text: result?.modelInput || "",
+          },
+        ],
+        modelInputMode: "image + text",
+      },
       parsedActions: [],
     }],
   }, alwaysOnRuntimePatch({

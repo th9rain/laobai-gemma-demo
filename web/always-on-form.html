@@ -77,33 +77,58 @@
         </div>
       </section>
 
-      <section class="operator">
-        <h1>Always-on 截图坐标填表</h1>
-        <p>
-          这个页面只用于承载真实 computer-use 测试：外部 Playwright 脚本截图，端侧 Gemma LiteRT 模型根据截图输出坐标 JSON，脚本再按坐标点击和输入。这里不再使用 DOM id 或结构化 observation 生成动作。
-        </p>
-        <div class="operator-panel">
-          <div class="model-row">
-            <div>
-              <strong data-edge-label>Gemma 4B/E4B Computer-Use</strong>
-              <span>输入：屏幕截图 + 任务；输出：坐标动作 JSON。</span>
+      <section class="operator operator-wide">
+        <div class="hero-copy">
+          <div class="eyebrow">Gemma E4B · on-device computer use</div>
+          <h1>Always-on 真实截图填表</h1>
+          <p>
+            外部 Runner 截取左侧手机页面，Gemma E4B 接收图片和任务文本，返回坐标动作 JSON。执行器只按模型给出的 x/y 坐标点击和输入，提交前由 guard 停住。
+          </p>
+        </div>
+
+        <div class="status-strip">
+          <div class="status-card">
+            <span>输入</span>
+            <strong>PNG 截图 + Prompt</strong>
+          </div>
+          <div class="status-card">
+            <span>模型</span>
+            <strong data-edge-label>Gemma E4B LiteRT</strong>
+          </div>
+          <div class="status-card">
+            <span>输出</span>
+            <strong>坐标动作 JSON</strong>
+          </div>
+          <div class="status-card">
+            <span>云端 Planner</span>
+            <strong data-planner-badge>未使用</strong>
+          </div>
+        </div>
+
+        <div class="controls showcase-controls">
+          <button class="primary-btn" data-start type="button">等待外部坐标 Runner</button>
+          <button class="secondary-btn" data-reset type="button">重置页面</button>
+          <a class="secondary-btn" href="./trigger-health.html">切到 Trigger 挂号</a>
+        </div>
+
+        <div class="showcase-grid">
+          <section class="run-panel">
+            <div class="panel-heading">
+              <span>执行链路</span>
+              <strong data-run-status>waiting</strong>
             </div>
-            <div class="pill">on-device</div>
-          </div>
-          <div class="model-row">
-            <div>
-              <strong data-planner-label>真实本地 Gemma 权重</strong>
-              <span>Always-on 不请求云端 planner；如果截图视觉调用失败，本轮直接失败。</span>
+            <div class="trace empty" data-trace></div>
+          </section>
+
+          <section class="io-panel">
+            <div class="panel-heading">
+              <span>Gemma 原始 IO</span>
+              <strong data-io-status>0 calls</strong>
             </div>
-            <div class="pill" data-planner-badge>not used</div>
-          </div>
-          <div class="controls">
-            <button class="primary-btn" data-start type="button">等待外部坐标 Runner</button>
-            <button class="secondary-btn" data-reset type="button">重置页面</button>
-            <a class="secondary-btn" href="./trigger-health.html" style="text-decoration:none; display:inline-grid; place-items:center;">切到 Trigger 挂号</a>
-          </div>
-          <div class="trace" data-trace></div>
-          <div class="model-io" data-model-io></div>
+            <div class="model-io empty" data-model-io>
+              <div class="empty-state">运行后这里会出现每次 Gemma 调用的截图输入、原始 payload、Prompt、原始输出和解析后的坐标动作。</div>
+            </div>
+          </section>
         </div>
       </section>
     </main>

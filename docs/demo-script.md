@@ -2,14 +2,20 @@
 
 ## 准备
 
-1. 配置 `config.local.json`，填入私有 planner endpoint、model 和 key。
-2. 运行：
+1. 确认本地 Gemma 权重和 LiteRT-LM 环境已准备好。
+2. 只录 Always-on 离线 demo 时运行：
+
+```powershell
+.\run-always-on-demo.ps1
+```
+
+3. 录完整 demo 时运行：
 
 ```powershell
 .\run-demo-server.ps1
 ```
 
-3. 浏览器打开首页后开始录屏。
+4. 浏览器打开首页后开始录屏。
 
 如果现场网络或本地模型服务不可用，可以直接打开 `web/always-on-form.html` 和 `web/trigger-health.html`，页面会使用内置安全 action 序列保证演示连续。
 

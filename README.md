@@ -11,6 +11,26 @@
 
 需要本机安装 Node.js 18+。
 
+只跑 `Always-on 自动填表` 的离线版本：
+
+```powershell
+.\tools\download-gemma-model.ps1
+.\tools\setup-litert-lm.ps1
+.\run-always-on-demo.ps1
+```
+
+这个入口会忽略 `config.local.json`，不会读取云端 planner endpoint 或 key。它只使用本地 `models/gemma-4-E4B-it.litertlm` 和 `.venv/Scripts/python.exe`。
+
+也可以不打开网页，直接在命令行跑本地 workflow：
+
+```powershell
+.\run-always-on-workflow.ps1
+```
+
+它会输出本地 Gemma 解析后的 action JSON，可用于检查 workflow 是否可离线运行。
+
+运行完整 Web Demo：
+
 ```powershell
 .\run-demo-server.ps1
 ```
@@ -30,13 +50,15 @@
 
 页面上不会展示 API Key，也不会展示具体底层供应商或转发服务。
 
+Always-on 不需要配置云端 Key。
+
 公开仓库只提交 `config.example.json`。本地演示时复制一份：
 
 ```powershell
 Copy-Item config.example.json config.local.json
 ```
 
-然后在 `config.local.json` 中填写私有 planner endpoint、model 和 key。这个文件被 `.gitignore` 忽略，不会提交到 GitHub。
+如果要运行 Trigger 看病挂号的云侧 planner，再在 `config.local.json` 中填写私有 planner endpoint、model 和 key。这个文件被 `.gitignore` 忽略，不会提交到 GitHub。
 如果要启用本地 Gemma Computer-Use，先下载权重并安装 LiteRT-LM：
 
 ```powershell
@@ -112,10 +134,12 @@ web/
   agent.js
 tools/
   demo-server.mjs
+  always-on-workflow.py
   verify-demo.mjs
 config.example.json
 run-demo-server.ps1
 run-always-on-demo.ps1
+run-always-on-workflow.ps1
 run-trigger-demo.ps1
 ```
 

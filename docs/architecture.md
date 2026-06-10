@@ -21,6 +21,27 @@ HTML 手机模拟页
     -> 实时写入执行轨迹
 ```
 
+Always-on 离线入口：
+
+```text
+run-always-on-demo.ps1
+  -> 忽略 config.local.json
+  -> 清空云端 planner / edge 环境变量
+  -> 启用 LAOBAI_LOCAL_GEMMA_ENABLED=1
+  -> 打开 always-on-form.html
+  -> /api/plan 进入 always-on-local-only
+  -> tools/always-on-workflow.py 调用本地 Gemma 权重
+```
+
+命令行 workflow 验证入口：
+
+```text
+run-always-on-workflow.ps1
+  -> 使用 tools/always-on-workflow.py 内置固定表单 observation
+  -> 调用 tools/always-on-workflow.py
+  -> 输出本地 action JSON
+```
+
 ## 模型层
 
 页面上只展示两个演示能力：
@@ -70,6 +91,7 @@ Trigger 分支才会先调用云端 planner，再调用本地 Gemma 生成/校�
 
 链路：
 
+- `run-always-on-demo.ps1` 显式关闭云端配置，只启用本地 Gemma
 - `Accessibility/页面摘要` 识别固定社区报名表
 - `/api/plan` 进入 `always-on-local-only` 分支
 - `tools/always-on-workflow.py` 调用本地 Gemma LiteRT 权重

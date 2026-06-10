@@ -32,16 +32,27 @@ FIXED_WORKFLOW = {
 ALLOWED_TYPES = {"click", "type", "select", "wait", "guard"}
 HIGH_RISK_TARGETS = ("submit", "confirm", "payment", "otp", "delete", "authorize")
 
+DEFAULT_OBSERVATION = {
+    "device": "mobile-portrait-sim",
+    "pageTitle": "北京市朝阳区社区智慧课堂报名表",
+    "visibleFields": ["姓名", "年龄段", "手机号", "居住区域", "紧急联系人", "报名课程"],
+    "privacy": {
+        "rawScreenUploaded": False,
+        "redaction": "strict",
+        "sensitiveFields": ["phone"],
+    },
+    "goal": "填写常用报名信息，并停在提交报名前",
+}
+
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", required=True)
-    parser.add_argument("--observation-file", required=True)
+    parser.add_argument("--observation-file", default="")
     parser.add_argument("--max-tokens", type=int, default=4096)
     args = parser.parse_args()
 
-    with open(args.observation_file, "r", encoding="utf-8") as f:
-        observation = json.load(f)
+    observation = read_observation(args.observation_file)
 
     prompt = build_prompt(observation)
     text = run_litert_lm(args.model, prompt, args.max_tokens)
@@ -55,6 +66,13 @@ def main():
         "plan": plan,
     }, ensure_ascii=False))
     return 0
+
+
+def read_observation(path):
+    if not path:
+        return DEFAULT_OBSERVATION
+    with open(path, "r", encoding="utf-8-sig") as f:
+        return json.load(f)
 
 
 def build_prompt(observation):

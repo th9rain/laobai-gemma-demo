@@ -1,5 +1,7 @@
 import argparse
+import contextlib
 import json
+import os
 import re
 import sys
 
@@ -25,26 +27,40 @@ def main():
 
 
 def run_litert_lm(model_path, prompt, max_tokens):
-    try:
-        from litert_lm import engine
-        from litert_lm import interfaces
-    except Exception as exc:
-        raise RuntimeError(f"litert-lm import failed: {exc}") from exc
-
-    sampler = interfaces.SamplerConfig(temperature=0.0, top_k=1)
-    llm = engine.Engine(model_path, backend=interfaces.Backend.CPU(), max_num_tokens=max_tokens)
-    try:
-        conversation = llm.create_conversation(sampler_config=sampler)
+    os.environ.setdefault("GLOG_minloglevel", "3")
+    with suppress_native_stderr():
         try:
-            response = conversation.send_message(prompt)
+            from litert_lm import engine
+            from litert_lm import interfaces
+        except Exception as exc:
+            raise RuntimeError(f"litert-lm import failed: {exc}") from exc
+
+        sampler = interfaces.SamplerConfig(temperature=0.0, top_k=1)
+        llm = engine.Engine(model_path, backend=interfaces.Backend.CPU(), max_num_tokens=max_tokens)
+        try:
+            conversation = llm.create_conversation(sampler_config=sampler)
+            try:
+                response = conversation.send_message(prompt)
+            finally:
+                conversation.close()
         finally:
-            conversation.close()
-    finally:
-        llm.close()
+            llm.close()
 
     if isinstance(response, dict):
         return response_to_text(response)
     return str(response)
+
+
+@contextlib.contextmanager
+def suppress_native_stderr():
+    original_stderr_fd = os.dup(2)
+    try:
+        with open(os.devnull, "w") as devnull:
+            os.dup2(devnull.fileno(), 2)
+            yield
+    finally:
+        os.dup2(original_stderr_fd, 2)
+        os.close(original_stderr_fd)
 
 
 def response_to_text(response):

@@ -30,6 +30,20 @@ models/gemma-4-E4B-it.litertlm
 
 ## 本地配置
 
+Always-on 自动填表不需要云端配置。准备好权重和 LiteRT-LM 后可以直接运行：
+
+```powershell
+.\run-always-on-demo.ps1
+```
+
+或直接验证本地 workflow：
+
+```powershell
+.\run-always-on-workflow.ps1
+```
+
+Trigger 看病挂号需要云侧 planner 时，再复制模板：
+
 复制模板：
 
 ```powershell

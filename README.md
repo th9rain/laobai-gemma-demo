@@ -3,7 +3,7 @@
 这个仓库用于验证两个比赛 demo：
 
 - `Always-on 填表`：必须走真实截图 computer-use 链路。本地 Gemma LiteRT 接收手机页面截图和任务，输出坐标动作 JSON，外部 Playwright runner 按坐标点击和输入。
-- `Trigger 看病挂号`：保留云端 planner 入口。没有云端配置时使用本地安全 fallback，保证挂号流程可展示。
+- `Trigger 看病挂号`：优化版 Trigger 页面。云端 30B Planner 使用历史调用回放 fixture 展示脱敏输入、Prompt、原始输出和解析结果；本地执行阶段使用 Gemma E4B 截图坐标链路打开模拟京医通、选择医院/科室/医生/时间，并在确认挂号、支付、验证码前 guard。
 
 ## 当前边界
 
@@ -18,6 +18,8 @@ Always-on 不再使用 DOM id、控件列表、结构化 observation 来假装 c
 如果本地 LiteRT 视觉调用失败或超时，Always-on 会直接失败，不会回退到静态填表。
 
 Gemma E4B 在这里按多模态端侧模型使用：Python runner 会用 LiteRT-LM 的 `vision_backend` 加载模型，并把 PNG 截图作为 image content 传给模型。模型返回的 JSON 必须包含 `x/y` 坐标，执行器只按这些坐标操作页面。
+
+Trigger 的云端规划不实时请求外部 API。为了保证现场稳定，它展示的是 cached cloud planner 记录；本地执行阶段仍然走截图坐标动作链路，并在右侧 IO 面板展示每一轮截图输入、Prompt、原始输出和解析后的动作 JSON。
 
 ## 快速启动
 
@@ -51,6 +53,14 @@ npx playwright install chromium
 .\run-trigger.ps1
 ```
 
+Trigger 会启动本地 server、打开优化版手机界面，并执行：
+
+1. 点击右下角“老白”浮窗进入对话。
+2. 展示云端 Planner 历史回放：脱敏症状、日程、常去医院、Planner Prompt 和 JSON 输出。
+3. 本地 Gemma 看手机截图，输出坐标 JSON。
+4. Runner 按坐标打开京医通，选择北京协和医院、消化内科、李明主任医师、后天上午 10:00。
+5. 到确认挂号 / 支付 / 验证码前停止。
+
 ## 模型配置
 
 Always-on 只使用本地 Gemma LiteRT：
@@ -61,18 +71,22 @@ $env:LAOBAI_LOCAL_GEMMA_MODEL_PATH = "models/gemma-4-E4B-it.litertlm"
 $env:LAOBAI_LOCAL_GEMMA_PYTHON = ".venv/Scripts/python.exe"
 ```
 
-Trigger 的云端 planner 配置放在 `config.local.json`，该文件不会提交到 GitHub。公开仓库只保留 `config.example.json`。
+模型权重、虚拟环境和本地配置不会提交到 GitHub。公开仓库只保留源码、页面、runner 和配置模板。
 
 ## 文件结构
 
 ```text
 web/
   always-on-form.html      # 被截图的手机表单页面
-  trigger-health.html      # Trigger 挂号页面
-  agent.js                 # 展示 trace/model IO；Trigger DOM 执行器
+  trigger-health.html      # 优化版 Trigger 手机挂号页面
+  trigger-health.js        # Trigger 对话、Planner 回放、执行状态渲染
+  agent.js                 # 展示 trace/model IO
+  vendor/framework7/       # Trigger 手机 UI 使用的本地静态样式
 tools/
   always-on-workflow.py    # Gemma LiteRT 多模态截图调用，校验坐标 JSON
+  trigger-health-workflow.py # Trigger Gemma 截图坐标调用
   external-always-on-runner.mjs # Playwright 截图与坐标执行
+  external-trigger-runner.mjs   # Trigger Playwright 截图与坐标执行
   demo-server.mjs          # 本地 API 代理；Always-on 禁止 fallback
 run-always-on.ps1          # 真实 Always-on 截图坐标链路入口
 run-trigger.ps1            # Trigger 挂号入口
@@ -86,4 +100,4 @@ $env:LAOBAI_HEADLESS = "1"
 .\run-always-on.ps1
 ```
 
-`npm run verify` 会检查 Always-on 是否拒绝旧的结构化 observation 请求，并确认 Trigger 仍可运行。`run-always-on.ps1` 会真正调用本地 Gemma E4B 多模态权重完成截图坐标链路。
+`npm run verify` 会检查 Always-on 是否拒绝旧的结构化 observation 请求，并确认 Trigger Planner fixture、脱敏 runtime 和 guard action 能正常返回。

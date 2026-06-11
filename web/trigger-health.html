@@ -4,140 +4,241 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>老白 Agent - Trigger 看病挂号</title>
+    <link rel="stylesheet" href="./vendor/framework7/framework7-bundle.min.css" />
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <main class="page">
-      <section class="phone" aria-label="模拟手机">
-        <div class="screen">
-          <div class="status-bar">
+    <main class="page trigger-page">
+      <section class="phone trigger-phone" aria-label="模拟老人手机">
+        <div class="screen trigger-screen" data-phone-screen>
+          <div class="status-bar trigger-status-bar">
             <span>09:41</span>
             <span>5G 88%</span>
           </div>
-          <div class="app-header">
-            <h2 class="app-title">北京医院挂号</h2>
-            <p class="app-subtitle">Trigger：我胃不舒服，帮我挂号</p>
-          </div>
-          <div class="screen-wrap">
-            <div class="app-content">
-              <div class="notice">
-                用户触发后，老白先做健康问询，再规划医院/科室，最后停在确认挂号前。
+
+          <div class="trigger-mobile f7-theme" data-trigger-computer-use-surface>
+            <section class="mobile-view active f7-home" data-view="home">
+              <div class="home-lock">
+                <div>
+                  <span>周三 6月10日</span>
+                  <strong>09:41</strong>
+                </div>
+                <div class="weather-pill">北京 26℃</div>
               </div>
 
-              <div class="field">
-                <label for="symptom">用户请求</label>
-                <textarea id="symptom">我胃不舒服，帮我挂号</textarea>
+              <div class="home-search">搜索应用、联系人和服务</div>
+
+              <div class="home-widgets">
+                <article class="phone-widget schedule">
+                  <span>明天日程</span>
+                  <strong>手机培训比赛彩排</strong>
+                  <p>09:30 - 17:30 · 朝阳区数字服务中心</p>
+                </article>
+                <article class="phone-widget health">
+                  <span>健康记忆</span>
+                  <strong>常挂：协和 · 消化内科</strong>
+                  <p>常去医生：李明 主任医师</p>
+                </article>
               </div>
 
-              <button id="ask-button" class="primary-btn" type="button">开始问询</button>
+              <div class="app-grid realistic-app-grid">
+                <button class="app-icon app-jyt" id="app-jingyitong" type="button">
+                  <span>京</span>
+                  <strong>京医通</strong>
+                </button>
+                <button class="app-icon app-wechat muted" type="button">
+                  <span>微</span>
+                  <strong>微信</strong>
+                </button>
+                <button class="app-icon app-class muted" type="button">
+                  <span>课</span>
+                  <strong>智慧课堂</strong>
+                </button>
+                <button class="app-icon app-calendar muted" type="button">
+                  <span>历</span>
+                  <strong>日历</strong>
+                </button>
+              </div>
+            </section>
 
-              <div id="question-card" class="notice" hidden>
-                您这个不舒服有多久了？有没有发热、呕吐、胸痛这些情况？
-              </div>
-              <button id="answer-button" class="secondary-btn" type="button" hidden>
-                回答：两天了，有点恶心，没有胸痛
-              </button>
-
-              <div class="field">
-                <label for="hospital">医院</label>
-                <select id="hospital">
-                  <option value="">请选择</option>
-                  <option>北京协和医院</option>
-                  <option>北京大学人民医院</option>
-                  <option>北京朝阳医院</option>
-                </select>
-              </div>
-              <div class="field">
-                <label for="department">科室</label>
-                <select id="department">
-                  <option value="">请选择</option>
-                  <option>消化内科</option>
-                  <option>呼吸内科</option>
-                  <option>神经内科</option>
-                </select>
-              </div>
-              <div class="field">
-                <label for="date">时间</label>
-                <select id="date">
-                  <option value="">请选择</option>
-                  <option>明天上午</option>
-                  <option>明天下午</option>
-                  <option>本周五上午</option>
-                </select>
-              </div>
-              <div class="field">
-                <label for="materials">准备材料</label>
-                <textarea id="materials"></textarea>
+            <section class="mobile-view hospital-view f7-page" data-view="hospital" hidden>
+              <div class="navbar mobile-navbar">
+                <div class="navbar-inner">
+                  <button class="link icon-only back-button" type="button" aria-label="返回">‹</button>
+                  <div class="title">京医通</div>
+                  <div class="right">北京</div>
+                </div>
               </div>
 
-              <button id="confirm-button" class="danger-btn">确认挂号 / 支付 / 验证码</button>
-              <div class="notice danger">
-                安全策略：挂号确认、支付和验证码必须由用户自己确认。
+              <div class="page-content booking-page">
+                <div class="booking-hero">
+                  <span>普通门诊挂号</span>
+                  <strong>为李桂兰选择就诊安排</strong>
+                  <p>当前只填到确认页，确认挂号、支付、验证码前会停住。</p>
+                </div>
+
+                <div class="list strong inset booking-list">
+                  <ul>
+                    <li>
+                      <button class="item-content booking-row" id="hospital-card" type="button">
+                        <div class="item-media hospital-mark">医</div>
+                        <div class="item-inner">
+                          <div class="item-title-row">
+                            <div class="item-title">北京协和医院</div>
+                            <div class="item-after" data-value>待选择</div>
+                          </div>
+                          <div class="item-subtitle">三甲 · 东单院区 · 常去医院</div>
+                        </div>
+                      </button>
+                    </li>
+                    <li>
+                      <button class="item-content booking-row" id="department-card" type="button">
+                        <div class="item-media dept-mark">科</div>
+                        <div class="item-inner">
+                          <div class="item-title-row">
+                            <div class="item-title">消化内科</div>
+                            <div class="item-after" data-value>待选择</div>
+                          </div>
+                          <div class="item-subtitle">胃部不适、轻微恶心，无胸痛</div>
+                        </div>
+                      </button>
+                    </li>
+                    <li>
+                      <button class="item-content booking-row doctor-row" id="doctor-card" type="button">
+                        <div class="item-media doctor-avatar">李</div>
+                        <div class="item-inner">
+                          <div class="item-title-row">
+                            <div class="item-title">李明 主任医师</div>
+                            <div class="item-after" data-value>待选择</div>
+                          </div>
+                          <div class="item-subtitle">常去医生 · 剩余 3 个号源</div>
+                        </div>
+                      </button>
+                    </li>
+                    <li>
+                      <button class="item-content booking-row time-row" id="time-card" type="button">
+                        <div class="item-media time-mark">10</div>
+                        <div class="item-inner">
+                          <div class="item-title-row">
+                            <div class="item-title">后天 上午 10:00</div>
+                            <div class="item-after" data-value>待选择</div>
+                          </div>
+                          <div class="item-subtitle">避开明天手机培训比赛</div>
+                        </div>
+                      </button>
+                    </li>
+                    <li>
+                      <button class="item-content booking-row patient-row" id="patient-card" type="button">
+                        <div class="item-media patient-mark">人</div>
+                        <div class="item-inner">
+                          <div class="item-title-row">
+                            <div class="item-title">就诊人</div>
+                            <div class="item-after" data-value>待填写</div>
+                          </div>
+                          <div class="item-subtitle">仅使用端侧本地记忆中的脱敏资料</div>
+                        </div>
+                      </button>
+                    </li>
+                  </ul>
+                </div>
+
+                <div class="card safety-card">
+                  <div class="card-content card-content-padding">
+                    <strong>安全边界</strong>
+                    <p>确认挂号、支付、验证码都属于高风险动作，老白只提醒，不自动点击。</p>
+                  </div>
+                </div>
               </div>
-            </div>
-            <div class="agent-toast" data-toast></div>
+
+              <div class="toolbar toolbar-bottom booking-toolbar">
+                <button class="danger-btn booking-confirm" id="confirm-booking" type="button">
+                  确认挂号 / 支付 / 验证码
+                </button>
+              </div>
+            </section>
+
+            <button class="laobai-fab" data-agent-fab type="button" aria-label="打开老白助手">
+              <span>白</span>
+              <strong>老白</strong>
+            </button>
+
+            <section class="chat-sheet" data-chat-sheet hidden>
+              <div class="chat-head">
+                <div class="avatar">白</div>
+                <div>
+                  <strong>老白助手</strong>
+                  <span data-chat-status>等待触发</span>
+                </div>
+              </div>
+              <div class="chat-messages" data-chat-messages></div>
+              <div class="chat-actions">
+                <button class="primary-btn" data-accept-booking type="button">好的，挂号</button>
+                <button class="secondary-btn" data-close-chat type="button">先不用</button>
+              </div>
+            </section>
+
+            <div class="local-pointer" data-local-pointer hidden></div>
           </div>
         </div>
       </section>
 
-      <section class="operator">
-        <h1>Trigger 看病挂号</h1>
-        <p>
-          这个页面模拟用户主动求助。端侧 Gemma 4B Computer-Use 完成问询和屏幕执行，Gemma 4 30B Cloud Planner 只接收脱敏症状摘要，返回下一步 GUI 动作。
-        </p>
-        <div class="operator-panel">
-          <div class="model-row">
-            <div>
-              <strong data-edge-label>Gemma 4B Computer-Use</strong>
-              <span>问询、页面控制、风险守卫。</span>
+      <section class="operator operator-wide trigger-operator">
+        <div class="hero-copy">
+          <div class="eyebrow">Trigger · Cached Cloud Plan + Local Computer Use</div>
+          <h1>Trigger 看病挂号</h1>
+          <p>
+            用户点击老白浮窗后进入对话。右侧展示云端 30B Planner 的历史回放输入和输出；真实执行请运行 .\run-trigger.ps1，本地阶段会由 Gemma E4B 看手机截图，输出坐标 JSON，再由 Runner 执行点击与填写，并在确认挂号、支付、验证码前停住。
+          </p>
+        </div>
+
+        <div class="status-strip">
+          <div class="status-card">
+            <span>入口</span>
+            <strong>老白浮窗 Trigger</strong>
+          </div>
+          <div class="status-card">
+            <span>云端 Planner</span>
+            <strong data-cloud-status>等待用户确认</strong>
+          </div>
+          <div class="status-card">
+            <span>本地执行</span>
+            <strong data-local-status>待接管</strong>
+          </div>
+          <div class="status-card">
+            <span>安全边界</span>
+            <strong>确认前停止</strong>
+          </div>
+        </div>
+
+        <div class="controls showcase-controls">
+          <button class="primary-btn" data-start-trigger type="button">点击老白浮窗</button>
+          <button class="secondary-btn" data-reset type="button">重置页面</button>
+          <a class="secondary-btn" href="./always-on-form.html">切到 Always On</a>
+        </div>
+
+        <div class="showcase-grid trigger-grid">
+          <section class="run-panel">
+            <div class="panel-heading">
+              <span>执行链路</span>
+              <strong data-run-status>waiting</strong>
             </div>
-            <div class="pill">on-device</div>
-          </div>
-          <div class="model-row">
-            <div>
-              <strong data-planner-label>Gemma 4 30B Cloud Planner</strong>
-              <span>脱敏挂号规划，返回 JSON action plan。</span>
+            <div class="trace empty" data-trace></div>
+          </section>
+
+          <section class="io-panel">
+            <div class="panel-heading">
+              <span>Planner / Gemma IO</span>
+              <strong data-io-status>0 calls</strong>
             </div>
-            <div class="pill" data-planner-badge>checking</div>
-          </div>
-          <div class="controls">
-            <button class="primary-btn" data-start>启动 Agent</button>
-            <button class="secondary-btn" data-reset>重置页面</button>
-            <a class="secondary-btn" href="./always-on-form.html" style="text-decoration:none; display:inline-grid; place-items:center;">切到填表 Demo</a>
-          </div>
-          <div class="trace" data-trace></div>
+            <div class="model-io empty" data-model-io>
+              <div class="empty-state">点击手机右侧“老白”浮窗后，这里会展示云端 Planner 回放，以及本地 Gemma Computer Use 的截图、Prompt、原始输出和坐标动作。</div>
+            </div>
+          </section>
         </div>
       </section>
     </main>
 
     <script src="./agent.js"></script>
-    <script>
-      document.getElementById("ask-button").addEventListener("click", () => {
-        document.getElementById("question-card").hidden = false;
-        document.getElementById("answer-button").hidden = false;
-      });
-
-      document.getElementById("answer-button").addEventListener("click", () => {
-        document.getElementById("question-card").textContent = "已记录：两天，轻微恶心，无胸痛。正在生成挂号计划。";
-      });
-
-      window.bootAgent({
-        scenario: "trigger-health",
-        observe() {
-          return {
-            device: "mobile-portrait-sim",
-            userRequest: document.getElementById("symptom").value,
-            symptomSummary: "胃不舒服，持续两天，轻微恶心，无胸痛",
-            visibleHospitals: ["北京协和医院", "北京大学人民医院", "北京朝阳医院"],
-            privacy: {
-              rawScreenUploaded: false,
-              redaction: "strict",
-              medicalDetail: "summary-only",
-            },
-            goal: "推荐挂号医院和科室，停在确认挂号/支付/验证码前",
-          };
-        },
-      });
-    </script>
+    <script src="./trigger-health.js"></script>
   </body>
 </html>

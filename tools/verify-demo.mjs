@@ -60,9 +60,10 @@ async function main() {
     });
     assert(health.runtime?.keyVisibleToBrowser === false, "health runtime exposes key state incorrectly");
     assert(health.runtime?.privacyScope, "health runtime missing privacy scope");
-    assertAction(health, "click", "ask-button");
-    assertAction(health, "select", "department");
-    assertAction(health, "guard", "confirm-button");
+    assert(health.appointment?.date === "后天", "health appointment should avoid tomorrow");
+    assertAction(health, "tap", "app-jingyitong");
+    assertAction(health, "choose", "department-card");
+    assertAction(health, "guard", "confirm-booking");
 
     console.log("Demo verification passed.");
   } catch (error) {

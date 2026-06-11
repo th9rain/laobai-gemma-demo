@@ -5,9 +5,13 @@
   "type": "module",
   "scripts": {
     "verify": "node tools/verify-demo.mjs",
-    "always-on:external": "node tools/external-always-on-runner.mjs"
+    "always-on:external": "node tools/external-always-on-runner.mjs",
+    "trigger:external": "node tools/external-trigger-runner.mjs"
   },
   "devDependencies": {
     "playwright": "^1.54.0"
+  },
+  "dependencies": {
+    "framework7": "^9.0.5"
   }
 }

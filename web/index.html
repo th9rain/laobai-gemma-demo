@@ -11,20 +11,20 @@
       <section class="operator">
         <h1>老白 Agent Web Demo</h1>
         <p>
-          电脑端运行的手机竖屏模拟界面。Always-on 必须调用本地 Gemma LiteRT 权重生成 GUI action；Trigger 看病挂号保留云侧 Planner。页面不展示 API Key，模型调用通过本地 server 代理。
+          电脑端运行的手机竖屏模拟界面。Always-on 使用本地 Gemma E4B / LiteRT 截图坐标链路；Trigger 使用云端 Planner 历史回放加本地 Gemma Computer Use 执行。页面不展示 API Key，模型调用通过本地 server 代理。
         </p>
         <div class="operator-panel">
           <div class="model-row">
             <div>
               <strong>Demo 1：Always-on 自动填表</strong>
-              <span>本地 Gemma 权重根据页面 observation 生成动作，自动填写常用资料，提交前停止。</span>
+              <span>本地 Gemma 根据手机截图生成坐标动作，连续两页填写资料，并在提交前停止。</span>
             </div>
             <a class="primary-btn" href="./always-on-form.html?autostart=1" style="text-decoration:none; display:inline-grid; place-items:center;">打开</a>
           </div>
           <div class="model-row">
             <div>
               <strong>Demo 2：Trigger 看病挂号</strong>
-              <span>用户触发问询，云侧 Planner 规划医院/科室，确认挂号前停止。</span>
+              <span>用户点击老白浮窗触发对话，Planner 回放生成挂号计划，本地 Gemma 执行到确认页前停止。</span>
             </div>
             <a class="secondary-btn" href="./trigger-health.html?autostart=1" style="text-decoration:none; display:inline-grid; place-items:center;">打开</a>
           </div>

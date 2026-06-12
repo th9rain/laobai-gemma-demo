@@ -4,6 +4,8 @@ let triggerTraceStep = 0;
 let triggerIoCount = 0;
 let triggerRunning = false;
 let triggerPlan = null;
+let triggerExternalRunnerSeen = false;
+let triggerExternalWaitToken = 0;
 
 const triggerNodes = {
   fab: document.querySelector("[data-agent-fab]"),
@@ -85,6 +87,20 @@ async function runTriggerPlanningFlow() {
     triggerNodes.localStatus.textContent = "预览完成";
     setTriggerStatus("preview");
     triggerRunning = false;
+  } else {
+    triggerNodes.localStatus.textContent = "等待外部 Runner";
+    setTriggerStatus("waiting-runner");
+    const waitToken = Date.now();
+    triggerExternalWaitToken = waitToken;
+    setTimeout(() => {
+      if (triggerExternalWaitToken !== waitToken || triggerExternalRunnerSeen) return;
+      addTriggerTrace(
+        "等待外部 Runner",
+        "这个 external 页面只负责接收 run-trigger.ps1 启动的 Playwright/Gemma runner 注入结果；如果你是在 Chrome 里手动打开它，规划完成后不会自己继续。请看脚本自动打开的 Chromium 窗口。",
+        true,
+      );
+      triggerNodes.localStatus.textContent = "等待 runner 注入";
+    }, 3500);
   }
 }
 
@@ -166,14 +182,17 @@ async function applyTriggerAction(action) {
 }
 
 window.renderTriggerExternalEvent = function renderTriggerExternalEvent(event) {
+  triggerExternalRunnerSeen = true;
   addTriggerTrace(event.title, event.detail, event.guard);
 };
 
 window.renderTriggerExternalModelCall = function renderTriggerExternalModelCall(call) {
+  triggerExternalRunnerSeen = true;
   renderTriggerModelCalls([call]);
 };
 
 window.applyTriggerExternalAction = async function applyTriggerExternalAction(action) {
+  triggerExternalRunnerSeen = true;
   await applyTriggerAction(action);
 };
 
@@ -300,6 +319,7 @@ function setTriggerStatus(status) {
       preview: "本地预览完成",
       guarded: "确认前停住",
       guard: "安全守卫",
+      "waiting-runner": "等待外部 Runner",
       running: "处理中",
     };
     triggerNodes.chatStatus.textContent = labels[status] || status;

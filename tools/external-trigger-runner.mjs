@@ -20,19 +20,31 @@ let keepOpen = !headless;
 
 const stages = ["home", "hospital", "time", "patient", "guard"];
 
+page.on("pageerror", (error) => {
+  console.error(`[trigger-runner] page error: ${error.message}`);
+});
+page.on("requestfailed", (request) => {
+  console.error(`[trigger-runner] request failed: ${request.method()} ${request.url()} ${request.failure()?.errorText || ""}`);
+});
+
 try {
+  log("opening runner-controlled Trigger page");
   await page.goto(`${baseUrl}/trigger-health.html?external=1`, { waitUntil: "domcontentloaded" });
+  await page.bringToFront();
   await page.waitForSelector("[data-trigger-computer-use-surface]");
   await page.evaluate(() => {
     window.updateRunStatus?.("running");
     window.updateIoStatus?.("0 calls");
   });
 
+  log("running cached cloud planner replay");
   const cloudPlan = await page.evaluate(() => window.startTriggerForRunner?.());
   await fs.writeFile(path.join(runDir, "trigger-cloud-plan.json"), JSON.stringify(cloudPlan, null, 2), "utf8");
+  log("cloud planner replay complete; starting local Gemma screenshot rounds");
 
   const modelCalls = [];
   for (const stage of stages) {
+    log(`stage ${stage}: preparing screen`);
     await page.evaluate((item) => window.prepareTriggerStageForRunner?.(item), stage);
     const screenshot = await captureTriggerScreenshot(stage);
     await page.evaluate((event) => window.renderTriggerExternalEvent?.(event), {
@@ -40,7 +52,9 @@ try {
       detail: `已截取手机屏幕 PNG：${screenshot.width}x${screenshot.height}，准备交给 Gemma E4B。`,
     });
 
+    log(`stage ${stage}: calling local Gemma`);
     const plan = await requestLocalTriggerPlan({ stage, screenshot });
+    log(`stage ${stage}: local Gemma returned ${plan.actions?.length || 0} action(s)`);
     await fs.writeFile(path.join(runDir, `trigger-${stage}-plan.json`), JSON.stringify(plan, null, 2), "utf8");
     modelCalls.push(...(plan.modelCalls || []));
     for (const call of plan.modelCalls || []) {
@@ -64,6 +78,7 @@ try {
       if (action.type === "guard") break;
     }
 
+    log(`stage ${stage}: execution complete`);
     await normalizeStageAfterExecution(stage);
   }
 
@@ -132,6 +147,10 @@ async function captureTriggerScreenshot(stage) {
 }
 
 async function requestLocalTriggerPlan(payload) {
+  await page.evaluate((event) => window.renderTriggerExternalEvent?.(event), {
+    title: `请求本地 Gemma / ${payload.stage}`,
+    detail: "正在把本轮手机截图和任务 Prompt 发送给本地 Gemma E4B LiteRT。首次加载模型可能需要 1-3 分钟。",
+  });
   const response = await fetch(`${baseUrl}/api/plan`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -157,6 +176,10 @@ async function requestLocalTriggerPlan(payload) {
     throw new Error(plan.error || "Trigger model output did not pass validation.");
   }
   return plan;
+}
+
+function log(message) {
+  console.log(`[trigger-runner] ${message}`);
 }
 
 async function executeTriggerCoordinateAction(action, screenshot, stage) {

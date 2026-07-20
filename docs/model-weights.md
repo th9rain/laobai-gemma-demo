@@ -20,7 +20,15 @@
 models/gemma-4-E4B-it.litertlm
 ```
 
-这个文件约 3.66GB，`models/` 已加入 `.gitignore`。
+这个文件约 3.66GB，`models/` 已加入 `.gitignore`。权重以两个分片托管在本仓库的
+[`model-weights-v1` GitHub Release](https://github.com/th9rain/laobai-gemma-demo/releases/tag/model-weights-v1) 中，
+下载脚本会自动下载、合并并用 SHA-256 校验完整文件。
+
+完整文件 SHA-256：
+
+```text
+0B2A8980CE155FD97673D8E820B4D29D9C7D99B8FA6806F425D969B145BD52E0
+```
 
 安装 LiteRT-LM 本地运行环境：
 

@@ -5,13 +5,11 @@
   "type": "module",
   "scripts": {
     "verify": "node tools/verify-demo.mjs",
-    "always-on:external": "node tools/external-always-on-runner.mjs",
-    "trigger:external": "node tools/external-trigger-runner.mjs"
+    "workflow:test": "node tools/mobile-workflow-runner.mjs all",
+    "workflow:always-on": "node tools/mobile-workflow-runner.mjs always-on",
+    "workflow:trigger": "node tools/mobile-workflow-runner.mjs trigger"
   },
   "devDependencies": {
     "playwright": "^1.54.0"
-  },
-  "dependencies": {
-    "framework7": "^9.0.5"
   }
 }

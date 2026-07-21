@@ -1,30 +1,11 @@
 $ErrorActionPreference = "Stop"
-
-$env:LAOBAI_SKIP_LOCAL_CONFIG = "1"
-$env:LAOBAI_PLANNER_ENDPOINT = ""
-$env:LAOBAI_PLANNER_MODEL = ""
-$env:LAOBAI_PLANNER_API_KEY = ""
-$env:LAOBAI_EDGE_ENDPOINT = ""
-$env:LAOBAI_EDGE_MODEL = ""
-$env:LAOBAI_EDGE_API_KEY = ""
-$env:LAOBAI_LOCAL_GEMMA_ENABLED = "1"
-$env:LAOBAI_LOCAL_GEMMA_MODEL_PATH = "models/gemma-4-E4B-it.litertlm"
-$env:LAOBAI_LOCAL_GEMMA_PYTHON = ".venv/Scripts/python.exe"
-$env:LAOBAI_DEMO_PORT = "4174"
-$env:LAOBAI_EXTERNAL_BASE_URL = "http://127.0.0.1:4174"
-if (-not $env:LAOBAI_HEADLESS) {
-  $env:LAOBAI_HEADLESS = "0"
-}
-
-$server = Start-Process -FilePath "node" `
-  -ArgumentList @(".\tools\demo-server.mjs", "--host", "127.0.0.1", "--port", "4174", "--no-open") `
-  -WorkingDirectory (Get-Location) `
-  -WindowStyle Hidden `
-  -PassThru
-
+$repoRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+Push-Location $repoRoot
 try {
-  Start-Sleep -Seconds 2
-  node .\tools\external-always-on-runner.mjs
+  Write-Host "Running Always-on form workflow at 390x844..." -ForegroundColor Cyan
+  Write-Host "The workflow will stop before 提交报名." -ForegroundColor Yellow
+  node .\tools\mobile-workflow-runner.mjs always-on
+  if ($LASTEXITCODE -ne 0) { throw "Always-on workflow failed." }
 } finally {
-  Stop-Process -Id $server.Id -Force -ErrorAction SilentlyContinue
+  Pop-Location
 }

@@ -77,19 +77,13 @@ $env:LAOBAI_LOCAL_GEMMA_PYTHON = ".venv/Scripts/python.exe"
 
 ```text
 web/
-  always-on-form.html      # 被截图的手机表单页面
-  trigger-health.html      # 优化版 Trigger 手机挂号页面
-  trigger-health.js        # Trigger 对话、Planner 回放、执行状态渲染
-  agent.js                 # 展示 trace/model IO
-  vendor/framework7/       # Trigger 手机 UI 使用的本地静态样式
+  always-on-form.html      # 独立的老年大学报名业务页面
+  trigger-health.html      # 独立的京医通挂号业务页面
 tools/
-  always-on-workflow.py    # Gemma LiteRT 多模态截图调用，校验坐标 JSON
-  trigger-health-workflow.py # Trigger Gemma 截图坐标调用
-  external-always-on-runner.mjs # Playwright 截图与坐标执行
-  external-trigger-runner.mjs   # Trigger Playwright 截图与坐标执行
-  demo-server.mjs          # 本地 API 代理；Always-on 禁止 fallback
-run-always-on.ps1          # 真实 Always-on 截图坐标链路入口
-run-trigger.ps1            # Trigger 挂号入口
+  mobile-workflow-runner.mjs # 两个业务的移动视口回放与安全验证
+  gemma-vision-smoke.py    # 本地 Gemma 4B 视觉动作验证
+run-always-on.ps1          # Always-on 工作流入口
+run-trigger.ps1            # 京医通历史规划回放入口
 ```
 
 ## 验证

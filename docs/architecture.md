@@ -2,7 +2,7 @@
 
 ## 目标
 
-老白 Agent Web Demo 用电脑上的浏览器模拟老人手机。页面保持竖屏手机比例，适合直接录屏。它不在界面展示 API Key。
+老白提供两个独立的真实业务 HTML，后续由 Android 本地文件直接打开。页面本身不包含手机外壳、Agent 面板或模型调试界面。
 
 ## 总体结构
 
@@ -13,12 +13,14 @@ PowerShell 启动脚本
     -> /api/public-config 暴露安全显示名
     -> /api/plan 隐藏 Key，并按 scenario 路由到本地 workflow 或云侧 planner
 
-HTML 手机模拟页
-  -> web/agent.js
-    -> 读取页面观察摘要
-    -> 请求 /api/plan
-    -> 按 action JSON 执行 click/type/select/guard
-    -> 实时写入执行轨迹
+独立业务 HTML
+  -> web/always-on-form.html
+  -> web/trigger-health.html
+
+端侧执行验证
+  -> tools/mobile-workflow-runner.mjs
+  -> tap/type_at/select/scroll/wait/guard 动作协议
+  -> 最终提交或确认前停止
 ```
 
 Always-on 真实本地权重入口：

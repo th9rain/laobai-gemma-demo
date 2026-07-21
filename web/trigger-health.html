@@ -1,244 +1,75 @@
 <!doctype html>
 <html lang="zh-CN">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>老白 Agent - Trigger 看病挂号</title>
-    <link rel="stylesheet" href="./vendor/framework7/framework7-bundle.min.css" />
-    <link rel="stylesheet" href="./styles.css" />
-  </head>
-  <body>
-    <main class="page trigger-page">
-      <section class="phone trigger-phone" aria-label="模拟老人手机">
-        <div class="screen trigger-screen" data-phone-screen>
-          <div class="status-bar trigger-status-bar">
-            <span>09:41</span>
-            <span>5G 88%</span>
-          </div>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="theme-color" content="#ffffff">
+  <title>京医通</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}html,body{min-height:100%;background:#f3f5f7;color:#222;font:14px/1.55 "PingFang SC","Microsoft YaHei",sans-serif}button,input{font:inherit}.app{min-height:100vh;padding-bottom:66px}.top{position:sticky;z-index:20;top:0;height:50px;padding:0 12px;display:grid;grid-template-columns:42px 1fr 42px;align-items:center;background:#fff;border-bottom:1px solid #e9e9e9}.top h1{text-align:center;font-size:17px;font-weight:600}.top button{height:42px;border:0;color:#333;background:transparent}.back{font-size:31px;text-align:left;font-weight:300}.more{font-size:18px;letter-spacing:2px}.page{display:none}.page.active{display:block}.city{height:42px;padding:0 14px;display:flex;align-items:center;gap:7px;color:#555;background:#fff;font-size:12px}.pin{width:12px;height:12px;border:2px solid #e64a40;border-radius:50% 50% 50% 0;transform:rotate(-45deg)}.city span:last-child{margin-left:auto;color:#999}.banner{margin:10px 12px 0;padding:17px;border-radius:10px;color:#fff;background:linear-gradient(120deg,#2384c9,#35a7c9);box-shadow:0 8px 20px rgba(35,132,201,.2)}.banner small{opacity:.8}.banner h2{margin:4px 0;font-size:21px;font-weight:600}.banner p{font-size:11px;opacity:.88}.quick{margin:10px 12px 0;padding:17px 10px;display:grid;grid-template-columns:repeat(4,1fr);gap:6px;border-radius:9px;background:#fff}.quick button{border:0;background:transparent;color:#555;font-size:11px}.quick i{width:42px;height:42px;margin:0 auto 6px;display:grid;place-items:center;border-radius:13px;color:#fff;background:#2b8dcc;font-style:normal;font-size:18px}.quick button:nth-child(2) i{background:#43a87f}.quick button:nth-child(3) i{background:#ef9f43}.quick button:nth-child(4) i{background:#7589c2}.section{margin:10px 12px 0;padding:13px;border-radius:9px;background:#fff}.section-head{margin-bottom:10px;display:flex;align-items:center;justify-content:space-between}.section-head h3{font-size:15px}.section-head span{color:#999;font-size:10px}.service-row{padding:11px 0;display:flex;align-items:center;gap:10px;border-bottom:1px solid #eee}.service-row:last-child{border:0}.service-icon{width:36px;height:36px;display:grid;place-items:center;border-radius:9px;color:#fff;background:#4b9dcd}.service-row div{flex:1}.service-row strong{display:block;font-size:13px}.service-row small{color:#999;font-size:10px}.arrow{color:#bbb;font-size:20px}.notice{margin:10px 12px 0;padding:12px;border-radius:8px;color:#8b713c;background:#fff9ec;border:1px solid #f1dfb9;font-size:10px}.search{padding:10px 12px;background:#fff}.search-box{height:38px;padding:0 12px;display:flex;align-items:center;gap:7px;border-radius:19px;color:#999;background:#f1f3f5;font-size:12px}.search-box input{min-width:0;flex:1;border:0;outline:0;background:transparent}.filter{padding:9px 12px;display:flex;gap:8px;overflow-x:auto;background:#fff;border-top:1px solid #f1f1f1}.filter button{flex:none;padding:5px 12px;border:0;border-radius:14px;color:#666;background:#f1f3f5;font-size:11px}.filter button.active{color:#fff;background:#2688c9}.list{margin-top:8px;background:#fff}.hospital{width:100%;padding:14px 13px;display:flex;gap:11px;border:0;border-bottom:1px solid #eee;background:#fff;text-align:left}.hospital-logo{width:52px;height:52px;flex:none;display:grid;place-items:center;border-radius:6px;color:#2b83bc;background:#e9f5fb;border:1px solid #c8e6f5;font-weight:700}.hospital div{min-width:0;flex:1}.hospital h3{font-size:14px}.tags{margin:3px 0}.tag{margin-right:4px;padding:1px 5px;border-radius:2px;color:#2485c4;background:#e9f5fb;font-size:9px}.hospital p{color:#888;font-size:10px}.distance{color:#999;font-size:10px}.hospital.selected,.choice.selected{background:#f2f9fd}.crumb{padding:9px 13px;color:#777;background:#fff;border-bottom:1px solid #eee;font-size:10px}.crumb b{color:#2588c8;font-weight:500}.dept-group{margin:9px 12px 0;overflow:hidden;border-radius:8px;background:#fff}.dept-title{padding:9px 12px;color:#777;background:#f8f9fa;font-size:11px}.choice{width:100%;min-height:58px;padding:10px 13px;display:flex;align-items:center;border:0;border-bottom:1px solid #eee;background:#fff;text-align:left}.choice:last-child{border:0}.choice div{min-width:0;flex:1}.choice strong{display:block;font-size:13px}.choice small{display:block;margin-top:2px;color:#999;font-size:10px}.doctor{width:100%;padding:14px 13px;display:flex;gap:11px;border:0;border-bottom:1px solid #eee;background:#fff;text-align:left}.avatar{width:48px;height:48px;flex:none;display:grid;place-items:center;border-radius:50%;color:#fff;background:#e7a04b;font-size:17px}.doctor-main{min-width:0;flex:1}.doctor h3{font-size:14px}.doctor h3 span{margin-left:5px;color:#777;font-size:10px;font-weight:400}.doctor p{margin-top:3px;color:#888;font-size:10px}.doctor-meta{display:flex;align-items:center;justify-content:space-between;margin-top:6px}.doctor-meta b{color:#e76845;font-size:11px}.doctor-meta em{color:#dc813b;font-size:10px;font-style:normal}.date-tabs{padding:10px 8px;display:flex;background:#fff;border-bottom:1px solid #eee}.date-tab{flex:1;padding:6px 2px;border:0;border-right:1px solid #eee;color:#777;background:#fff;font-size:10px}.date-tab:last-child{border:0}.date-tab b{display:block;color:#333;font-size:12px}.date-tab.active{color:#2788c8}.date-tab.active b{color:#2788c8}.schedule-card{margin:10px 12px 0;border-radius:9px;background:#fff}.schedule-doctor{padding:13px;display:flex;align-items:center;gap:10px;border-bottom:1px solid #eee}.schedule-doctor .avatar{width:40px;height:40px}.schedule-doctor div{flex:1}.schedule-doctor strong{display:block}.schedule-doctor small{color:#888;font-size:10px}.slots{padding:12px;display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.slot{padding:9px 3px;border:1px solid #d7dfe5;border-radius:4px;color:#555;background:#fff;font-size:11px}.slot span{display:block;color:#e66a45;font-size:9px}.slot.selected{color:#fff;border-color:#2889ca;background:#2889ca}.slot.selected span{color:#fff}.slot.disabled{color:#bbb;background:#f4f4f4}.patient-card{margin:10px 12px 0;padding:13px;border-radius:9px;background:linear-gradient(120deg,#2b81bf,#36a2c0);color:#fff}.patient-head{display:flex;align-items:center;gap:10px}.medical{width:36px;height:36px;display:grid;place-items:center;border-radius:50%;background:rgba(255,255,255,.2);font-size:22px}.patient-head div{flex:1}.patient-head small{display:block;opacity:.75;font-size:9px}.patient-head strong{font-size:16px}.verified{padding:2px 7px;border:1px solid rgba(255,255,255,.5);border-radius:10px;font-size:9px}.patient-info{margin-top:9px;padding-top:8px;display:flex;justify-content:space-between;border-top:1px solid rgba(255,255,255,.2);font-size:9px;opacity:.82}.order-card{margin:10px 12px 0;overflow:hidden;border-radius:9px;background:#fff}.order-title{padding:11px 13px;border-bottom:1px solid #eee;font-size:14px;font-weight:700}.order-row{padding:10px 13px;display:flex;border-bottom:1px dashed #eee;font-size:11px}.order-row span{width:82px;color:#999}.order-row b{flex:1;font-weight:400;text-align:right}.fee-row{padding:12px 13px;display:flex;justify-content:space-between}.fee-row strong{color:#e55042;font-size:17px}.agreement{padding:12px 14px 20px;display:flex;align-items:flex-start;gap:7px;color:#888;font-size:10px}.agreement input{margin-top:2px;accent-color:#2788c8}.bottom{position:fixed;z-index:30;left:0;right:0;bottom:0;height:62px;padding:7px 12px calc(7px + env(safe-area-inset-bottom));display:flex;align-items:center;gap:10px;background:#fff;border-top:1px solid #e5e5e5;box-shadow:0 -2px 8px rgba(0,0,0,.04)}.bottom-info{min-width:0;flex:1}.bottom-info small{display:block;color:#888;font-size:9px}.bottom-info strong{color:#e65042;font-size:17px}.primary{height:46px;padding:0 27px;border:0;border-radius:5px;color:#fff;background:#e94d42;font-size:14px}.blue{background:#2788c8}.toast{display:none;position:fixed;z-index:60;left:50%;top:50%;padding:10px 16px;transform:translate(-50%,-50%);border-radius:5px;color:#fff;background:rgba(0,0,0,.78);font-size:12px}.toast.show{display:block}.modal{display:none;position:fixed;z-index:70;inset:0;padding:22px;align-items:center;justify-content:center;background:rgba(0,0,0,.5)}.modal.show{display:flex}.modal-box{width:min(330px,90vw);padding:22px 16px;border-radius:8px;background:#fff;text-align:center}.modal-box i{width:48px;height:48px;margin:auto;display:grid;place-items:center;border-radius:50%;color:#fff;background:#48a66d;font-style:normal;font-size:25px}.modal-box h3{margin:9px 0 5px}.modal-box p{color:#777;font-size:11px}.modal-box button{width:100%;margin-top:15px}@media(min-width:760px){body{max-width:760px;margin:auto;box-shadow:0 0 30px rgba(0,0,0,.1)}.bottom{left:50%;right:auto;width:760px;transform:translateX(-50%)}}
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header class="top"><button class="back" id="backBtn" type="button"></button><h1 id="pageTitle">京医通</h1><button class="more" type="button">•••</button></header>
 
-          <div class="trigger-mobile f7-theme" data-trigger-computer-use-surface>
-            <section class="mobile-view active f7-home" data-view="home">
-              <div class="home-lock">
-                <div>
-                  <span>周三 6月10日</span>
-                  <strong>09:41</strong>
-                </div>
-                <div class="weather-pill">北京 26℃</div>
-              </div>
+    <section class="page active" id="homePage" data-page="home">
+      <div class="city"><i class="pin"></i><b>北京市</b><span>切换城市</span></div>
+      <div class="banner"><small>北京市预约挂号统一平台</small><h2>预约挂号，就医更省心</h2><p>覆盖全市300余家医院，提供预约挂号、报告查询、就诊服务</p></div>
+      <div class="quick"><button id="appointmentEntry" type="button"><i>号</i>预约挂号</button><button type="button"><i>报</i>报告查询</button><button type="button"><i>缴</i>门诊缴费</button><button type="button"><i>卡</i>电子健康卡</button></div>
+      <section class="section"><div class="section-head"><h3>常用服务</h3><span>全部服务 ›</span></div><div class="service-row"><span class="service-icon">候</span><div><strong>候诊查询</strong><small>查看当前排队及预计候诊时间</small></div><span class="arrow">›</span></div><div class="service-row"><span class="service-icon" style="background:#56a982">诊</span><div><strong>互联网诊疗</strong><small>在线复诊、咨询与处方服务</small></div><span class="arrow">›</span></div><div class="service-row"><span class="service-icon" style="background:#ec9e45">记</span><div><strong>挂号记录</strong><small>查看预约、退号和就诊记录</small></div><span class="arrow">›</span></div></section>
+      <div class="notice">温馨提示：平台不会通过电话或短信索要验证码，请妥善保管个人信息，谨防诈骗。</div>
+    </section>
 
-              <div class="home-search">搜索应用、联系人和服务</div>
+    <section class="page" id="hospitalPage" data-page="hospital">
+      <div class="search"><label class="search-box">⌕<input type="search" placeholder="搜索医院名称"></label></div><div class="filter"><button class="active">综合排序</button><button>三甲医院</button><button>距离最近</button><button>有号</button></div>
+      <div class="list">
+        <button class="hospital" id="hospital-card" type="button"><span class="hospital-logo">协和</span><div><h3>北京协和医院</h3><div class="tags"><span class="tag">三甲</span><span class="tag">综合医院</span><span class="tag">医保定点</span></div><p>东单院区 · 东城区帅府园1号</p></div><span class="distance">2.8km ›</span></button>
+        <button class="hospital" type="button"><span class="hospital-logo">同仁</span><div><h3>首都医科大学附属北京同仁医院</h3><div class="tags"><span class="tag">三甲</span><span class="tag">综合医院</span></div><p>崇文门院区 · 东城区东交民巷1号</p></div><span class="distance">3.2km ›</span></button>
+        <button class="hospital" type="button"><span class="hospital-logo">朝阳</span><div><h3>首都医科大学附属北京朝阳医院</h3><div class="tags"><span class="tag">三甲</span><span class="tag">综合医院</span></div><p>本部 · 朝阳区工人体育场南路8号</p></div><span class="distance">4.1km ›</span></button>
+        <button class="hospital" type="button"><span class="hospital-logo">北医</span><div><h3>北京大学第一医院</h3><div class="tags"><span class="tag">三甲</span><span class="tag">综合医院</span></div><p>西城区西什库大街8号</p></div><span class="distance">5.6km ›</span></button>
+      </div>
+    </section>
 
-              <div class="home-widgets">
-                <article class="phone-widget schedule">
-                  <span>明天日程</span>
-                  <strong>手机培训比赛彩排</strong>
-                  <p>09:30 - 17:30 · 朝阳区数字服务中心</p>
-                </article>
-                <article class="phone-widget health">
-                  <span>健康记忆</span>
-                  <strong>常挂：协和 · 消化内科</strong>
-                  <p>常去医生：李明 主任医师</p>
-                </article>
-              </div>
+    <section class="page" id="departmentPage" data-page="department">
+      <div class="crumb">已选医院：<b>北京协和医院 · 东单院区</b></div><div class="search"><label class="search-box">⌕<input type="search" placeholder="搜索科室"></label></div>
+      <div class="dept-group"><div class="dept-title">常用科室</div><button class="choice" id="department-card" type="button"><div><strong>消化内科门诊</strong><small>胃食管疾病、肝胆胰疾病、消化系统常见病</small></div><span class="arrow">›</span></button><button class="choice" type="button"><div><strong>普通内科门诊</strong><small>常见内科疾病初诊与综合诊疗</small></div><span class="arrow">›</span></button></div>
+      <div class="dept-group"><div class="dept-title">内科</div><button class="choice" type="button"><div><strong>心内科门诊</strong><small>冠心病、高血压、心律失常</small></div><span class="arrow">›</span></button><button class="choice" type="button"><div><strong>呼吸内科门诊</strong><small>呼吸系统疾病、慢性咳嗽</small></div><span class="arrow">›</span></button><button class="choice" type="button"><div><strong>内分泌科门诊</strong><small>糖尿病、甲状腺及代谢疾病</small></div><span class="arrow">›</span></button></div>
+    </section>
 
-              <div class="app-grid realistic-app-grid">
-                <button class="app-icon app-jyt" id="app-jingyitong" type="button">
-                  <span>京</span>
-                  <strong>京医通</strong>
-                </button>
-                <button class="app-icon app-wechat muted" type="button">
-                  <span>微</span>
-                  <strong>微信</strong>
-                </button>
-                <button class="app-icon app-class muted" type="button">
-                  <span>课</span>
-                  <strong>智慧课堂</strong>
-                </button>
-                <button class="app-icon app-calendar muted" type="button">
-                  <span>历</span>
-                  <strong>日历</strong>
-                </button>
-              </div>
-            </section>
+    <section class="page" id="doctorPage" data-page="doctor">
+      <div class="crumb">北京协和医院　›　<b>消化内科门诊</b></div><div class="filter"><button class="active">推荐医生</button><button>主任医师</button><button>普通门诊</button></div><div class="list">
+        <button class="doctor" id="doctor-card" type="button"><span class="avatar">李</span><div class="doctor-main"><h3>李明<span>主任医师 · 教授</span></h3><p>擅长胃肠疾病、消化系统常见病及疑难病诊治</p><div class="doctor-meta"><b>挂号费 ¥80</b><em>近7日有号　›</em></div></div></button>
+        <button class="doctor" type="button"><span class="avatar" style="background:#5aa98b">王</span><div class="doctor-main"><h3>王晓梅<span>副主任医师</span></h3><p>擅长功能性胃肠病、慢性胃炎及消化不良</p><div class="doctor-meta"><b>挂号费 ¥60</b><em>明日有号　›</em></div></div></button>
+        <button class="doctor" type="button"><span class="avatar" style="background:#778ac1">赵</span><div class="doctor-main"><h3>赵建国<span>主治医师</span></h3><p>消化内科常见疾病诊治及胃镜检查</p><div class="doctor-meta"><b>挂号费 ¥50</b><em>今日有号　›</em></div></div></button>
+      </div>
+    </section>
 
-            <section class="mobile-view hospital-view f7-page" data-view="hospital" hidden>
-              <div class="navbar mobile-navbar">
-                <div class="navbar-inner">
-                  <button class="link icon-only back-button" type="button" aria-label="返回">‹</button>
-                  <div class="title">京医通</div>
-                  <div class="right">北京</div>
-                </div>
-              </div>
+    <section class="page" id="schedulePage" data-page="schedule">
+      <div class="crumb">北京协和医院　›　消化内科　›　<b>李明 主任医师</b></div><div class="date-tabs"><button class="date-tab"><b>今天</b>7月21日</button><button class="date-tab"><b>明天</b>7月22日</button><button class="date-tab active"><b>后天</b>7月23日</button><button class="date-tab"><b>周五</b>7月24日</button></div>
+      <section class="schedule-card"><div class="schedule-doctor"><span class="avatar">李</span><div><strong>李明　主任医师</strong><small>消化内科门诊 · 东单院区</small></div><span class="tag">余3</span></div><div class="slots"><button class="slot disabled" disabled>08:30<span>约满</span></button><button class="slot" type="button">09:30<span>余1</span></button><button class="slot" id="time-card" type="button">10:00<span>余1</span></button><button class="slot" type="button">10:30<span>余1</span></button><button class="slot disabled" disabled>11:00<span>约满</span></button><button class="slot disabled" disabled>11:30<span>约满</span></button></div></section>
+      <div class="notice">号源更新时间：09:40。预约成功后请按提示时间到院候诊，过号需重新排队。</div>
+    </section>
 
-              <div class="page-content booking-page">
-                <div class="booking-hero">
-                  <span>普通门诊挂号</span>
-                  <strong>为李桂兰选择就诊安排</strong>
-                  <p>当前只填到确认页，确认挂号、支付、验证码前会停住。</p>
-                </div>
+    <section class="page" id="orderPage" data-page="order">
+      <section class="patient-card" id="patient-card"><div class="patient-head"><span class="medical">+</span><div><small>当前就诊人</small><strong>李桂兰</strong></div><span class="verified">已实名</span></div><div class="patient-info"><span>北京市医保</span><span>138****2675</span></div></section>
+      <section class="order-card"><div class="order-title">预约信息</div><div class="order-row"><span>就诊医院</span><b>北京协和医院（东单院区）</b></div><div class="order-row"><span>就诊科室</span><b>消化内科门诊</b></div><div class="order-row"><span>接诊医生</span><b>李明 主任医师</b></div><div class="order-row"><span>就诊日期</span><b>7月23日 周四</b></div><div class="order-row"><span>预约时段</span><b>上午 10:00-10:30</b></div><div class="order-row"><span>就诊序号</span><b>以医院当日叫号为准</b></div><div class="fee-row"><span>挂号费</span><strong>¥80.00</strong></div></section>
+      <div class="notice">请持就诊人有效身份证件和医保卡，按预约时段提前30分钟到院取号。</div><label class="agreement"><input id="orderAgreement" type="checkbox" checked><span>我已阅读并同意《预约挂号服务协议》，确认以上就诊信息无误。</span></label>
+    </section>
+  </main>
 
-                <div class="list strong inset booking-list">
-                  <ul>
-                    <li>
-                      <button class="item-content booking-row" id="hospital-card" type="button">
-                        <div class="item-media hospital-mark">医</div>
-                        <div class="item-inner">
-                          <div class="item-title-row">
-                            <div class="item-title">北京协和医院</div>
-                            <div class="item-after" data-value>待选择</div>
-                          </div>
-                          <div class="item-subtitle">三甲 · 东单院区 · 常去医院</div>
-                        </div>
-                      </button>
-                    </li>
-                    <li>
-                      <button class="item-content booking-row" id="department-card" type="button">
-                        <div class="item-media dept-mark">科</div>
-                        <div class="item-inner">
-                          <div class="item-title-row">
-                            <div class="item-title">消化内科</div>
-                            <div class="item-after" data-value>待选择</div>
-                          </div>
-                          <div class="item-subtitle">胃部不适、轻微恶心，无胸痛</div>
-                        </div>
-                      </button>
-                    </li>
-                    <li>
-                      <button class="item-content booking-row doctor-row" id="doctor-card" type="button">
-                        <div class="item-media doctor-avatar">李</div>
-                        <div class="item-inner">
-                          <div class="item-title-row">
-                            <div class="item-title">李明 主任医师</div>
-                            <div class="item-after" data-value>待选择</div>
-                          </div>
-                          <div class="item-subtitle">常去医生 · 剩余 3 个号源</div>
-                        </div>
-                      </button>
-                    </li>
-                    <li>
-                      <button class="item-content booking-row time-row" id="time-card" type="button">
-                        <div class="item-media time-mark">10</div>
-                        <div class="item-inner">
-                          <div class="item-title-row">
-                            <div class="item-title">后天 上午 10:00</div>
-                            <div class="item-after" data-value>待选择</div>
-                          </div>
-                          <div class="item-subtitle">避开明天手机培训比赛</div>
-                        </div>
-                      </button>
-                    </li>
-                    <li>
-                      <button class="item-content booking-row patient-row" id="patient-card" type="button">
-                        <div class="item-media patient-mark">人</div>
-                        <div class="item-inner">
-                          <div class="item-title-row">
-                            <div class="item-title">就诊人</div>
-                            <div class="item-after" data-value>待填写</div>
-                          </div>
-                          <div class="item-subtitle">仅使用端侧本地记忆中的脱敏资料</div>
-                        </div>
-                      </button>
-                    </li>
-                  </ul>
-                </div>
+  <footer class="bottom" id="bottomBar" hidden><div class="bottom-info"><small>挂号费</small><strong>¥80.00</strong></div><button class="primary" id="confirm-booking" type="button">确认挂号</button></footer>
+  <div class="toast" id="toast"></div><div class="modal" id="successModal"><div class="modal-box"><i>✓</i><h3>预约成功</h3><p>请在15分钟内完成支付，超时后本次预约号源将自动释放。</p><button class="primary blue" id="modalOk" type="button">查看预约记录</button></div></div>
 
-                <div class="card safety-card">
-                  <div class="card-content card-content-padding">
-                    <strong>安全边界</strong>
-                    <p>确认挂号、支付、验证码都属于高风险动作，老白只提醒，不自动点击。</p>
-                  </div>
-                </div>
-              </div>
-
-              <div class="toolbar toolbar-bottom booking-toolbar">
-                <button class="danger-btn booking-confirm" id="confirm-booking" type="button">
-                  确认挂号 / 支付 / 验证码
-                </button>
-              </div>
-            </section>
-
-            <button class="laobai-fab" data-agent-fab type="button" aria-label="打开老白助手">
-              <span>白</span>
-              <strong>老白</strong>
-            </button>
-
-            <section class="chat-sheet" data-chat-sheet hidden>
-              <div class="chat-head">
-                <div class="avatar">白</div>
-                <div>
-                  <strong>老白助手</strong>
-                  <span data-chat-status>等待触发</span>
-                </div>
-              </div>
-              <div class="chat-messages" data-chat-messages></div>
-              <div class="chat-actions">
-                <button class="primary-btn" data-accept-booking type="button">好的，挂号</button>
-                <button class="secondary-btn" data-close-chat type="button">先不用</button>
-              </div>
-            </section>
-
-            <div class="local-pointer" data-local-pointer hidden></div>
-          </div>
-        </div>
-      </section>
-
-      <section class="operator operator-wide trigger-operator">
-        <div class="hero-copy">
-          <div class="eyebrow">Trigger · Cached Cloud Plan + Local Computer Use</div>
-          <h1>Trigger 看病挂号</h1>
-          <p>
-            用户点击老白浮窗后进入对话。右侧展示云端 30B Planner 的历史回放输入和输出；真实执行请运行 .\run-trigger.ps1，本地阶段会由 Gemma E4B 看手机截图，输出坐标 JSON，再由 Runner 执行点击与填写，并在确认挂号、支付、验证码前停住。
-          </p>
-        </div>
-
-        <div class="status-strip">
-          <div class="status-card">
-            <span>入口</span>
-            <strong>老白浮窗 Trigger</strong>
-          </div>
-          <div class="status-card">
-            <span>云端 Planner</span>
-            <strong data-cloud-status>等待用户确认</strong>
-          </div>
-          <div class="status-card">
-            <span>本地执行</span>
-            <strong data-local-status>待接管</strong>
-          </div>
-          <div class="status-card">
-            <span>安全边界</span>
-            <strong>确认前停止</strong>
-          </div>
-        </div>
-
-        <div class="controls showcase-controls">
-          <button class="primary-btn" data-start-trigger type="button">点击老白浮窗</button>
-          <button class="secondary-btn" data-reset type="button">重置页面</button>
-          <a class="secondary-btn" href="./always-on-form.html">切到 Always On</a>
-        </div>
-
-        <div class="showcase-grid trigger-grid">
-          <section class="run-panel">
-            <div class="panel-heading">
-              <span>执行链路</span>
-              <strong data-run-status>waiting</strong>
-            </div>
-            <div class="trace empty" data-trace></div>
-          </section>
-
-          <section class="io-panel">
-            <div class="panel-heading">
-              <span>Planner / Gemma IO</span>
-              <strong data-io-status>0 calls</strong>
-            </div>
-            <div class="model-io empty" data-model-io>
-              <div class="empty-state">点击手机右侧“老白”浮窗后，这里会展示云端 Planner 回放，以及本地 Gemma Computer Use 的截图、Prompt、原始输出和坐标动作。</div>
-            </div>
-          </section>
-        </div>
-      </section>
-    </main>
-
-    <script src="./agent.js"></script>
-    <script src="./trigger-health.js"></script>
-  </body>
+  <script>
+    (()=>{
+      const byId=id=>document.getElementById(id);const pages={home:byId('homePage'),hospital:byId('hospitalPage'),department:byId('departmentPage'),doctor:byId('doctorPage'),schedule:byId('schedulePage'),order:byId('orderPage')};const history=[];let current='home';const titles={home:'京医通',hospital:'选择医院',department:'选择科室',doctor:'选择医生',schedule:'选择号源',order:'确认预约'};
+      const show=(name,push=true)=>{if(push&&current!==name)history.push(current);current=name;Object.entries(pages).forEach(([key,node])=>node.classList.toggle('active',key===name));byId('pageTitle').textContent=titles[name];byId('backBtn').textContent=name==='home'?'':'‹';byId('bottomBar').hidden=name!=='order';scrollTo(0,0)};
+      const flash=text=>{const toast=byId('toast');toast.textContent=text;toast.classList.add('show');setTimeout(()=>toast.classList.remove('show'),1100)};
+      byId('appointmentEntry').onclick=()=>show('hospital');byId('hospital-card').onclick=()=>{byId('hospital-card').classList.add('selected');show('department')};byId('department-card').onclick=()=>{byId('department-card').classList.add('selected');show('doctor')};byId('doctor-card').onclick=()=>{byId('doctor-card').classList.add('selected');show('schedule')};byId('time-card').onclick=()=>{byId('time-card').classList.add('selected');flash('已选择 10:00 号源');setTimeout(()=>show('order'),450)};
+      byId('backBtn').onclick=()=>{if(history.length)show(history.pop(),false)};byId('confirm-booking').onclick=()=>{if(!byId('orderAgreement').checked){flash('请先同意预约挂号服务协议');return}byId('successModal').classList.add('show')};byId('modalOk').onclick=()=>{byId('successModal').classList.remove('show');history.length=0;show('home',false)};
+    })();
+  </script>
+</body>
 </html>

@@ -33,7 +33,10 @@ const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url || "/", `http://localhost:${port}`);
     if (req.method === "GET" && url.pathname === "/") {
-      return serveFile(res, path.join(webDir, "index.html"));
+      return sendJson(res, {
+        ok: false,
+        error: "No index page. Open /always-on-form.html or /trigger-health.html.",
+      }, 404);
     }
     if (req.method === "GET" && url.pathname === "/api/public-config") {
       return sendJson(res, {
@@ -48,7 +51,7 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, plan);
     }
     if (req.method === "GET") {
-      const safePath = safeJoin(webDir, url.pathname === "/" ? "index.html" : url.pathname);
+      const safePath = safeJoin(webDir, url.pathname);
       return serveFile(res, safePath);
     }
     res.writeHead(405);

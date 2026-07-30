@@ -208,7 +208,7 @@ object AccessibilityNodeOps {
                 normalize(ownText(node)) == normalize(target.label)
             }
             (byId ?: byHint ?: label)
-                ?.performAction(AccessibilityNodeInfo.ACTION_SHOW_ON_SCREEN)
+                ?.performAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_SHOW_ON_SCREEN.id)
                 ?: false
         }
 
@@ -218,7 +218,7 @@ object AccessibilityNodeOps {
             nodes.firstOrNull { node ->
                 val actual = normalize(ownText(node))
                 if (exact) actual == wanted else actual.contains(wanted)
-            }?.performAction(AccessibilityNodeInfo.ACTION_SHOW_ON_SCREEN) ?: false
+            }?.performAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_SHOW_ON_SCREEN.id) ?: false
         }
 
     @Suppress("DEPRECATION")

@@ -154,10 +154,20 @@ async function triggerHealthPlannerRequest(payload) {
 }
 
 async function alwaysOnLocalWorkflowRequest(payload) {
+  const screenshot = payload?.screenshot || {};
+  const screenshotInput = String(screenshot.path || payload?.screenshotPath || "").trim();
+  const pageNumber = Number(payload?.page || screenshot.page || 1);
+  const width = Number(screenshot.width || payload?.width || 0);
+  const height = Number(screenshot.height || payload?.height || 0);
+  if (!screenshotInput || !width || !height) {
+    throw new Error("Always-on computer-use requires a screenshot path, width, and height. Structured observation fallback is disabled.");
+  }
+
   if (!config.localGemmaEnabled) {
     throw new Error("Always-on requires LAOBAI_LOCAL_GEMMA_ENABLED=1. Static fallback is disabled.");
   }
 
+  const screenshotPath = path.resolve(rootDir, screenshotInput);
   const modelPath = path.resolve(rootDir, config.localGemmaModelPath || "");
   const pythonPath = path.resolve(rootDir, config.localGemmaPython || "");
   try {
@@ -167,14 +177,6 @@ async function alwaysOnLocalWorkflowRequest(payload) {
     throw new Error(`Always-on real Gemma dependency missing: ${error?.message || error}`);
   }
 
-  const screenshot = payload?.screenshot || {};
-  const screenshotPath = path.resolve(rootDir, String(screenshot.path || payload?.screenshotPath || ""));
-  const pageNumber = Number(payload?.page || screenshot.page || 1);
-  const width = Number(screenshot.width || payload?.width || 0);
-  const height = Number(screenshot.height || payload?.height || 0);
-  if (!screenshotPath || !width || !height) {
-    throw new Error("Always-on computer-use requires a screenshot path, width, and height. Structured observation fallback is disabled.");
-  }
   try {
     await fs.access(screenshotPath);
   } catch (error) {

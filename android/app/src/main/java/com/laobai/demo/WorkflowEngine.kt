@@ -1,7 +1,7 @@
 package com.laobai.demo
 
-import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.GestureDescription
+import android.accessibilityservice.AccessibilityService.GestureResultCallback
 import android.graphics.Path
 import android.os.Handler
 import android.os.Looper
@@ -9,9 +9,10 @@ import android.os.SystemClock
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
+import org.json.JSONObject
 
 class WorkflowEngine(
-    private val service: AccessibilityService,
+    private val service: LaoBaiAccessibilityService,
     private val onUpdate: (WorkflowUpdate) -> Unit,
 ) {
     private val handler = Handler(Looper.getMainLooper())
@@ -32,6 +33,15 @@ class WorkflowEngine(
     private var verificationRetries = 0
     private var targetScope: TargetScope? = null
     private var startedAtElapsedMs = 0L
+    private var runGeneration = 0L
+    private var inferencePending = false
+    private var gesturePending = false
+    private var lastScrollFingerprint: Int? = null
+    private var scrollIssued = false
+    private var traceSessionId: String? = null
+    private val completedVqaStages = mutableSetOf<String>()
+    private val vqaAttempts = mutableMapOf<String, Int>()
+    private var pendingModelScrollStage: String? = null
 
     val latestUpdate: WorkflowUpdate
         get() = lastUpdate
@@ -77,17 +87,24 @@ class WorkflowEngine(
             steps = emptyList()
             stepIndex = 0
             targetScope = null
+            GemmaRuntime.closeSession()
             emit(WorkflowPhase.IDLE, "待命")
         }
     }
 
     fun start(demoCase: DemoCase) {
+        runGeneration += 1L
         clearScheduledAdvance()
+        inferencePending = false
+        gesturePending = false
+        resetSearchState()
+        completedVqaStages.clear()
+        vqaAttempts.clear()
+        pendingModelScrollStage = null
         pendingOption = null
         pendingOptionRetries = 0
         pendingVerification = null
         verificationRetries = 0
-        misses = 0
         val root = findCaseRoot(demoCase)
         if (root == null) {
             activeCase = demoCase
@@ -99,6 +116,24 @@ class WorkflowEngine(
         }
 
         activeCase = demoCase
+        if (GemmaModelRepository.installedSelectedVariant(service) == null) {
+            AccessibilityNodeOps.recycle(root)
+            targetScope = null
+            return emit(
+                WorkflowPhase.ERROR,
+                "请先在老白主界面下载并校验 E4B 或 E2B 端侧模型",
+            )
+        }
+        traceSessionId = runCatching {
+            ModelTraceStore.startSession(service, demoCase)
+        }.getOrElse { error ->
+            AccessibilityNodeOps.recycle(root)
+            targetScope = null
+            return emit(WorkflowPhase.ERROR, "无法创建模型调用记录：${error.message}")
+        }
+        if (demoCase == DemoCase.TRIGGER) {
+            TriggerPlannerReplay.record(service, traceSessionId.orEmpty())
+        }
         steps = replayFor(demoCase)
         val packageName = root.packageName?.toString().orEmpty()
         if (packageName.isBlank()) {
@@ -115,7 +150,11 @@ class WorkflowEngine(
         startedAtElapsedMs = SystemClock.elapsedRealtime()
         emit(
             WorkflowPhase.RUNNING,
-            "已启动离线回放",
+            if (demoCase == DemoCase.TRIGGER) {
+                "云端规划已回放，准备运行端侧 VQA"
+            } else {
+                "准备运行端侧 VQA"
+            },
             stepIndex.coerceAtMost(steps.size),
             steps.size,
         )
@@ -123,26 +162,36 @@ class WorkflowEngine(
     }
 
     fun cancel(reason: String = "用户已取消自动操作") {
+        runGeneration += 1L
         clearScheduledAdvance()
+        inferencePending = false
+        gesturePending = false
         pendingOption = null
         pendingVerification = null
+        pendingModelScrollStage = null
         targetScope = null
         if (phase == WorkflowPhase.RUNNING || phase == WorkflowPhase.AWAITING_CONFIRMATION) {
             emit(WorkflowPhase.CANCELLED, reason, stepIndex, steps.size)
         }
+        GemmaRuntime.closeSession()
     }
 
     fun shutdown() {
+        runGeneration += 1L
         handler.removeCallbacksAndMessages(null)
         advanceScheduled = false
+        inferencePending = false
+        gesturePending = false
         pendingOption = null
         pendingVerification = null
+        pendingModelScrollStage = null
         targetScope = null
         phase = WorkflowPhase.IDLE
+        GemmaRuntime.closeSession()
     }
 
     fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        if (phase != WorkflowPhase.RUNNING || event == null) return
+        if (phase != WorkflowPhase.RUNNING || inferencePending || gesturePending || event == null) return
         val expectedPackage = targetScope?.packageName
         val eventPackage = event.packageName?.toString()
         if (expectedPackage != null && eventPackage != null && eventPackage != expectedPackage) return
@@ -157,7 +206,7 @@ class WorkflowEngine(
     }
 
     private fun advance() {
-        if (phase != WorkflowPhase.RUNNING) return
+        if (phase != WorkflowPhase.RUNNING || inferencePending || gesturePending) return
         if (SystemClock.elapsedRealtime() - startedAtElapsedMs > MAX_WORKFLOW_DURATION_MS) {
             return fail("操作超时，已安全停止")
         }
@@ -206,6 +255,16 @@ class WorkflowEngine(
         }
 
         val step = steps[stepIndex]
+        val vqaStage = vqaStageFor(demoCase, stepIndex)
+        if (vqaStage != null && pendingModelScrollStage == vqaStage) {
+            pendingModelScrollStage = null
+            findByScrolling(root, step)
+            return
+        }
+        if (vqaStage != null && completedVqaStages.add(vqaStage)) {
+            requestVqaObservation(demoCase, step, vqaStage)
+            return
+        }
         emit(
             WorkflowPhase.RUNNING,
             "正在${step.progressLabel}",
@@ -216,7 +275,7 @@ class WorkflowEngine(
         when (val result = execute(step, root)) {
             StepResult.DONE -> {
                 stepIndex += 1
-                misses = 0
+                resetSearchState()
                 scheduleAdvance(if (step is ClickStep) 700 else 300)
             }
 
@@ -230,10 +289,336 @@ class WorkflowEngine(
                 scheduleAdvance(if (step is ClickStep) 700 else 280)
             }
 
-            StepResult.NOT_FOUND -> findByScrolling(root, step)
+            StepResult.NOT_FOUND -> {
+                vqaStage?.let(completedVqaStages::remove)
+                findByScrolling(root, step)
+            }
             is StepResult.FAILED -> fail(result.reason)
         }
     }
+
+    private fun requestVqaObservation(
+        demoCase: DemoCase,
+        step: ReplayStep,
+        stage: String,
+    ) {
+        val sessionId = traceSessionId ?: return fail("模型调用记录会话丢失")
+        val scope = targetScope ?: return fail("目标窗口已失效")
+        val attempt = (vqaAttempts[stage] ?: 0) + 1
+        vqaAttempts[stage] = attempt
+        if (attempt > MAX_VQA_ATTEMPTS_PER_STAGE) {
+            return fail("端侧 VQA 多次仍未找到“${step.progressLabel}”，已安全停止")
+        }
+        val traceTitle = "$stage / 第 $attempt 次观察"
+        val generation = runGeneration
+        val expectedStepIndex = stepIndex
+        inferencePending = true
+        emit(
+            WorkflowPhase.RUNNING,
+            "端侧 Gemma 正在理解屏幕：${step.progressLabel}",
+            stepIndex + 1,
+            steps.size,
+        )
+        service.captureScreenForVqa(
+            sessionId = sessionId,
+            stage = stage,
+            windowId = scope.windowId,
+        ) { screenshotResult ->
+            if (!isCurrentVqa(generation, expectedStepIndex, scope.windowId)) return@captureScreenForVqa
+            screenshotResult.onFailure { error ->
+                appendVqaTrace(
+                    sessionId = sessionId,
+                    title = traceTitle,
+                    prompt = buildVqaPrompt(demoCase, step, stage),
+                    output = "SCREENSHOT_ERROR: ${error.message ?: error.javaClass.simpleName}",
+                    screenshotPath = null,
+                    elapsedMs = 0L,
+                    backend = "未调用模型",
+                    status = "截图失败，工作流已安全停止",
+                )
+                inferencePending = false
+                fail("端侧 VQA 无法取得当前窗口截图；请查看模型记录")
+            }.onSuccess { screenshot ->
+                val prompt = buildVqaPrompt(demoCase, step, stage)
+                val inferenceStarted = SystemClock.elapsedRealtime()
+                GemmaRuntime.runVisionOnce(service, screenshot, prompt) { inferenceResult ->
+                    if (!isCurrentVqa(generation, expectedStepIndex, scope.windowId)) {
+                        return@runVisionOnce
+                    }
+                    inferenceResult.onSuccess { inference ->
+                        val validation = validateVqaOutput(inference.output)
+                        val assessment = validation.assessment
+                        val traceStatus = when {
+                            assessment == null -> validation.status
+                            assessment.action == "guard" -> "VQA 要求 guard，未授权执行"
+                            !assessment.targetVisible || assessment.action == "scroll" ->
+                                "VQA 未看到目标，授权一次受限滚动后重试"
+                            assessment.action == "wait" -> "VQA 建议等待后重试"
+                            !step.matchesVqaTarget(assessment.target) ->
+                                "VQA 目标与当前安全步骤不匹配，未授权执行"
+                            !step.acceptsVqaAction(assessment.action) ->
+                                "VQA 动作类型与当前安全步骤不匹配，未授权执行"
+                            else -> "真实 VQA 已授权当前低风险步骤；由语义执行器复核"
+                        }
+                        appendVqaTrace(
+                            sessionId = sessionId,
+                            title = traceTitle,
+                            prompt = prompt,
+                            output = inference.output,
+                            screenshotPath = screenshot.absolutePath,
+                            elapsedMs = inference.elapsedMs,
+                            backend = runtimeModeLabel(inference.mode),
+                            status = traceStatus,
+                        )
+                        inferencePending = false
+                        when {
+                            assessment == null ->
+                                fail("端侧 VQA 输出未通过校验；请查看模型记录")
+
+                            assessment.action == "guard" ->
+                                fail("端侧 VQA 要求在“${assessment.target}”前停止")
+
+                            !assessment.targetVisible || assessment.action == "scroll" -> {
+                                completedVqaStages.remove(stage)
+                                pendingModelScrollStage = stage
+                                emit(
+                                    WorkflowPhase.RUNNING,
+                                    "端侧 VQA 未看到目标，滚动一次后重新观察",
+                                    stepIndex + 1,
+                                    steps.size,
+                                )
+                                scheduleAdvance(120)
+                            }
+
+                            assessment.action == "wait" -> {
+                                completedVqaStages.remove(stage)
+                                emit(
+                                    WorkflowPhase.RUNNING,
+                                    "端侧 VQA 建议等待，稍后重新观察",
+                                    stepIndex + 1,
+                                    steps.size,
+                                )
+                                scheduleAdvance(650)
+                            }
+
+                            !step.matchesVqaTarget(assessment.target) ->
+                                fail("端侧 VQA 识别目标与当前安全步骤不匹配；请查看模型记录")
+
+                            !step.acceptsVqaAction(assessment.action) ->
+                                fail("端侧 VQA 建议动作与安全步骤不匹配；请查看模型记录")
+
+                            else -> {
+                                emit(
+                                    WorkflowPhase.RUNNING,
+                                    "端侧 VQA 已授权低风险操作：${step.progressLabel}",
+                                    stepIndex + 1,
+                                    steps.size,
+                                )
+                                scheduleAdvance(120)
+                            }
+                        }
+                    }.onFailure { error ->
+                        appendVqaTrace(
+                            sessionId = sessionId,
+                            title = traceTitle,
+                            prompt = prompt,
+                            output = "INFERENCE_ERROR: ${error.message ?: error.javaClass.simpleName}",
+                            screenshotPath = screenshot.absolutePath,
+                            elapsedMs = SystemClock.elapsedRealtime() - inferenceStarted,
+                            backend = "LiteRT-LM 初始化或推理失败",
+                            status = "端侧 VQA 失败，工作流已安全停止",
+                        )
+                        inferencePending = false
+                        fail("端侧 Gemma 推理失败；请查看模型记录或切换 E2B")
+                    }
+                }
+            }
+        }
+    }
+
+    private fun isCurrentVqa(
+        generation: Long,
+        expectedStepIndex: Int,
+        expectedWindowId: Int,
+    ): Boolean = phase == WorkflowPhase.RUNNING &&
+        runGeneration == generation &&
+        stepIndex == expectedStepIndex &&
+        targetScope?.windowId == expectedWindowId
+
+    private fun appendVqaTrace(
+        sessionId: String,
+        title: String,
+        prompt: String,
+        output: String,
+        screenshotPath: String?,
+        elapsedMs: Long,
+        backend: String,
+        status: String,
+    ) {
+        val variant = GemmaModelRepository.installedSelectedVariant(service)
+        runCatching {
+            ModelTraceStore.append(
+                service,
+                sessionId,
+                ModelTraceEntry(
+                    source = ModelTraceSource.EDGE_VQA,
+                    title = title,
+                    modelName = variant?.displayName ?: "Gemma 端侧模型",
+                    inputText = prompt,
+                    outputText = output.take(MAX_TRACE_OUTPUT_CHARS),
+                    screenshotPath = screenshotPath,
+                    elapsedMs = elapsedMs,
+                    backend = backend,
+                    status = status,
+                ),
+            )
+        }
+    }
+
+    private fun buildVqaPrompt(
+        demoCase: DemoCase,
+        step: ReplayStep,
+        stage: String,
+    ): String {
+        val cloudContext = if (demoCase == DemoCase.TRIGGER) {
+            """
+                云端 Planner 历史回放结果（只作为任务上下文，不代表当前联网）：
+                ${TriggerPlannerReplay.output}
+            """.trimIndent()
+        } else {
+            "本任务完全在端侧执行，不调用云端 Planner。"
+        }
+        return """
+            你是运行在安卓手机本地的老白 Gemma 屏幕 VQA 模型。
+            只观察随消息提供的当前应用窗口截图，不使用 DOM、HTML id 或无障碍节点。
+            场景：${demoCase.displayName}
+            当前阶段：$stage
+            受约束执行器准备进行的下一项低风险操作：${step.vqaContract()}
+            $cloudContext
+
+            请判断截图属于哪个页面、目标是否在当前画面可见，并给出建议动作类型。
+            只返回一个严格 JSON 对象，不要 Markdown，不要额外文字：
+            {"screen":"中文页面描述","targetVisible":true,"target":"中文目标","recommendedAction":"tap|type_at|select|scroll|wait|guard","reason":"中文理由"}
+            不得建议点击“提交报名”“确认挂号”、支付、验证码、授权或删除；遇到这些目标必须 recommendedAction=guard。
+            你的回答会被本地安全执行器再次验证，模型不会直接执行高风险操作。
+        """.trimIndent()
+    }
+
+    private fun ReplayStep.vqaContract(): String = when (this) {
+        is SetTextStep -> "在“${target.label}”中填写本地资料“$value”"
+        is ChoiceStep -> "选择“$text”"
+        is ClickStep -> "点击“$text”"
+        is SelectStep -> "在“${target.label}”中选择“$option”"
+    }
+
+    private fun ReplayStep.acceptsVqaAction(action: String): Boolean = when (this) {
+        is SetTextStep -> action == "type_at"
+        is ChoiceStep -> action == "tap" || action == "click" || action == "select"
+        is ClickStep -> action == "tap" || action == "click"
+        is SelectStep -> action == "tap" || action == "click" || action == "select"
+    }
+
+    private fun ReplayStep.matchesVqaTarget(modelTarget: String): Boolean {
+        val expected = when (this) {
+            is SetTextStep -> target.label
+            is ChoiceStep -> text
+            is ClickStep -> text
+            is SelectStep -> "$option ${target.label}"
+        }
+        val normalizedExpected = normalizeVqaLabel(expected)
+        val normalizedActual = normalizeVqaLabel(modelTarget)
+        if (normalizedExpected.isBlank() || normalizedActual.isBlank()) return false
+        return normalizedActual.contains(normalizedExpected) ||
+            normalizedExpected.contains(normalizedActual)
+    }
+
+    private fun normalizeVqaLabel(value: String): String =
+        value.replace(Regex("[\\s，。！？、,.!?；;：:\\-_/（）()]"), "")
+
+    private fun validateVqaOutput(output: String): VqaValidation {
+        if (output.length > MAX_TRACE_OUTPUT_CHARS) {
+            return VqaValidation(null, "VQA 输出过长，未授权执行")
+        }
+        val jsonText = firstJsonObject(output)
+            ?: return VqaValidation(null, "VQA 输出不是严格 JSON，未授权执行")
+        if (output.trim() != jsonText) {
+            return VqaValidation(null, "VQA 输出包含 JSON 之外的文字，未授权执行")
+        }
+        return runCatching {
+            val json = JSONObject(jsonText)
+            val action = json.optString("recommendedAction")
+            check(action in VQA_ACTIONS) { "动作类型不在白名单" }
+            val screen = json.getString("screen").also { check(it.isNotBlank()) }
+            val targetVisible = json.getBoolean("targetVisible")
+            val target = json.getString("target").also { check(it.isNotBlank()) }
+            val reason = json.getString("reason").also { check(it.isNotBlank()) }
+            VqaValidation(
+                assessment = VqaAssessment(
+                    screen = screen,
+                    targetVisible = targetVisible,
+                    target = target,
+                    action = action,
+                    reason = reason,
+                ),
+                status = "真实 VQA JSON 已校验；等待安全步骤匹配",
+            )
+        }.getOrElse { error ->
+            VqaValidation(null, "VQA JSON 校验失败（${error.message}），未授权执行")
+        }
+    }
+
+    private fun firstJsonObject(text: String): String? {
+        val start = text.indexOf('{')
+        if (start < 0) return null
+        var depth = 0
+        var quoted = false
+        var escaped = false
+        for (index in start until text.length) {
+            val char = text[index]
+            if (quoted) {
+                when {
+                    escaped -> escaped = false
+                    char == '\\' -> escaped = true
+                    char == '"' -> quoted = false
+                }
+                continue
+            }
+            when (char) {
+                '"' -> quoted = true
+                '{' -> depth += 1
+                '}' -> {
+                    depth -= 1
+                    if (depth == 0) return text.substring(start, index + 1)
+                }
+            }
+        }
+        return null
+    }
+
+    private fun runtimeModeLabel(mode: GemmaRuntimeMode): String = when (mode) {
+        GemmaRuntimeMode.MULTIMODAL_GPU -> "LiteRT-LM · GPU 多模态"
+        GemmaRuntimeMode.MULTIMODAL_CPU -> "LiteRT-LM · CPU 多模态"
+        GemmaRuntimeMode.TEXT_ONLY_CPU -> "LiteRT-LM · CPU 文本模式"
+    }
+
+    private fun vqaStageFor(demoCase: DemoCase, index: Int): String? {
+        val step = replayFor(demoCase).getOrNull(index) ?: return null
+        val prefix = if (demoCase == DemoCase.ALWAYS_ON) "Always On" else "Trigger"
+        return "$prefix / 步骤 ${index + 1} · ${step.progressLabel}"
+    }
+
+    private data class VqaAssessment(
+        val screen: String,
+        val targetVisible: Boolean,
+        val target: String,
+        val action: String,
+        val reason: String,
+    )
+
+    private data class VqaValidation(
+        val assessment: VqaAssessment?,
+        val status: String,
+    )
 
     private fun execute(
         step: ReplayStep,
@@ -322,7 +707,7 @@ class WorkflowEngine(
         if (clicked) {
             pendingOption = null
             pendingOptionRetries = 0
-            misses = 0
+            resetSearchState()
             val selectStep = step as? SelectStep
                 ?: return fail("下拉选择步骤状态异常")
             pendingVerification = Verification.Select(selectStep.target, option)
@@ -385,7 +770,7 @@ class WorkflowEngine(
         if (verified) {
             pendingVerification = null
             verificationRetries = 0
-            misses = 0
+            resetSearchState()
             stepIndex += 1
             scheduleAdvance(280)
             return
@@ -401,16 +786,41 @@ class WorkflowEngine(
     }
 
     private fun findByScrolling(root: AccessibilityNodeInfo, step: ReplayStep) {
+        val fingerprint = AccessibilityNodeOps.visibleText(root).hashCode()
+        if (scrollIssued && lastScrollFingerprint == fingerprint) {
+            return fail("页面没有继续移动，已停止查找“${step.progressLabel}”")
+        }
+
+        if (misses == 0 && showStepOnScreen(root, step)) {
+            misses = 1
+            scrollIssued = false
+            scheduleAdvance(420)
+            return
+        }
+
         misses += 1
         if (misses > MAX_SCROLL_ATTEMPTS) {
             return fail("在当前页面找不到“${step.progressLabel}”")
         }
 
         val forward = step.scrollForward
+        lastScrollFingerprint = fingerprint
+        scrollIssued = true
         val semanticScrollStarted = AccessibilityNodeOps.scroll(root, forward)
-        if (!semanticScrollStarted) dispatchVerticalScroll(forward)
-        scheduleAdvance(550)
+        if (semanticScrollStarted) {
+            scheduleAdvance(550)
+        } else {
+            dispatchVerticalScroll(forward)
+        }
     }
+
+    private fun showStepOnScreen(root: AccessibilityNodeInfo, step: ReplayStep): Boolean =
+        when (step) {
+            is SetTextStep -> AccessibilityNodeOps.showControlOnScreen(root, step.target)
+            is SelectStep -> AccessibilityNodeOps.showControlOnScreen(root, step.target)
+            is ChoiceStep -> AccessibilityNodeOps.showTextOnScreen(root, step.text, step.exact)
+            is ClickStep -> AccessibilityNodeOps.showTextOnScreen(root, step.text, step.exact)
+        }
 
     private fun retryWithoutScroll(message: String) {
         misses += 1
@@ -443,7 +853,29 @@ class WorkflowEngine(
         val gesture = GestureDescription.Builder()
             .addStroke(GestureDescription.StrokeDescription(path, 0, 480))
             .build()
-        service.dispatchGesture(gesture, null, null)
+        val generation = runGeneration
+        gesturePending = true
+        val started = service.dispatchGesture(
+            gesture,
+            object : GestureResultCallback() {
+                override fun onCompleted(gestureDescription: GestureDescription) {
+                    if (generation != runGeneration || phase != WorkflowPhase.RUNNING) return
+                    gesturePending = false
+                    scheduleAdvance(160)
+                }
+
+                override fun onCancelled(gestureDescription: GestureDescription) {
+                    if (generation != runGeneration || phase != WorkflowPhase.RUNNING) return
+                    gesturePending = false
+                    fail("页面滚动手势被系统取消")
+                }
+            },
+            handler,
+        )
+        if (!started) {
+            gesturePending = false
+            fail("系统未能启动页面滚动手势")
+        }
     }
 
     private fun blockedOrFailed(label: String): StepResult.FAILED {
@@ -504,18 +936,24 @@ class WorkflowEngine(
             DemoCase.TRIGGER -> "挂号信息已选择完毕；确认挂号和支付必须由您人工完成"
         }
         emit(WorkflowPhase.HUMAN_CONFIRMATION, message, stepIndex, steps.size)
+        GemmaRuntime.closeSession()
     }
 
     private fun fail(message: String) {
+        runGeneration += 1L
         clearScheduledAdvance()
+        inferencePending = false
+        gesturePending = false
         pendingOption = null
         pendingVerification = null
+        pendingModelScrollStage = null
         targetScope = null
         emit(WorkflowPhase.ERROR, message, stepIndex, steps.size)
+        GemmaRuntime.closeSession()
     }
 
     private fun scheduleAdvance(delayMs: Long) {
-        if (advanceScheduled) return
+        if (advanceScheduled || inferencePending || gesturePending) return
         advanceScheduled = true
         handler.postDelayed(advanceRunnable, delayMs)
     }
@@ -523,6 +961,12 @@ class WorkflowEngine(
     private fun clearScheduledAdvance() {
         handler.removeCallbacks(advanceRunnable)
         advanceScheduled = false
+    }
+
+    private fun resetSearchState() {
+        misses = 0
+        lastScrollFingerprint = null
+        scrollIssued = false
     }
 
     private fun emit(
@@ -798,7 +1242,7 @@ class WorkflowEngine(
     }
 
     companion object {
-        private const val MAX_SCROLL_ATTEMPTS = 8
+        private const val MAX_SCROLL_ATTEMPTS = 3
         private const val MAX_SELECT_RETRIES = 8
         private const val MAX_VERIFICATION_RETRIES = 6
         private const val MAX_ROOT_RETRIES = 8
@@ -893,6 +1337,17 @@ class WorkflowEngine(
             ),
         )
 
-        private const val MAX_WORKFLOW_DURATION_MS = 90_000L
+        private const val MAX_WORKFLOW_DURATION_MS = 8 * 60_000L
+        private const val MAX_TRACE_OUTPUT_CHARS = 16_384
+        private const val MAX_VQA_ATTEMPTS_PER_STAGE = 4
+        private val VQA_ACTIONS = setOf(
+            "tap",
+            "click",
+            "type_at",
+            "select",
+            "scroll",
+            "wait",
+            "guard",
+        )
     }
 }

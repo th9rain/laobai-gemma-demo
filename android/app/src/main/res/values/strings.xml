@@ -2,16 +2,25 @@
 <resources>
     <string name="app_name">老白</string>
     <string name="main_title">老白演示</string>
-    <string name="main_subtitle">一个 APK 内完成本地页面、悬浮交互、语音入口与离线工作流回放。</string>
+    <string name="main_subtitle">一个 APK 内完成端侧 Gemma、悬浮交互、语音入口与安全工作流。</string>
     <string name="permission_title">第一步：开启辅助操作</string>
     <string name="accessibility_enabled">无障碍服务已开启 · 悬浮窗可用</string>
     <string name="accessibility_disabled">无障碍服务未开启</string>
     <string name="permission_explanation">进入系统设置，选择“老白辅助操作”并开启。开启后红色“白”字悬浮气泡会自动出现。</string>
     <string name="open_accessibility_settings">前往无障碍设置</string>
+    <string name="model_title">第二步：安装端侧 Gemma</string>
+    <string name="model_device_checking">正在检测设备内存…</string>
+    <string name="model_not_installed">尚未安装模型</string>
+    <string name="download_e4b">下载 E4B · 3.66GB</string>
+    <string name="download_e2b">下载 E2B · 2.59GB</string>
+    <string name="cancel_model_download">暂停下载</string>
+    <string name="run_model_test">运行真实端侧自检</string>
+    <string name="model_output_empty">下载完成后可运行一次真实推理，结果会显示在这里。</string>
+    <string name="open_model_traces">查看模型调用记录（输入 / 输出）</string>
     <string name="cases_title">本地演示页面</string>
     <string name="open_always_on">打开 Always On 填表</string>
     <string name="open_trigger">打开京医通挂号</string>
-    <string name="safety_note">离线工作流会辅助填写和选择，并在“提交报名”“确认挂号”和支付前停止，等待您人工确认。</string>
+    <string name="safety_note">端侧模型与离线工作流只辅助填写和选择，并在“提交报名”“确认挂号”和支付前停止，等待您人工确认。</string>
     <string name="accessibility_service_label">老白辅助操作</string>
     <string name="accessibility_description">允许老白显示悬浮入口，并在您明确确认或说出口令后辅助点击、滚动和填写已识别的演示页面。</string>
     <string name="bubble_label">白</string>

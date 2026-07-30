@@ -26,8 +26,14 @@ android {
         applicationId = "com.laobai.demo"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.2.0"
+
+        ndk {
+            // Xiaomi 14 Pro and the supported deployment target are ARM64.
+            // Excluding x86_64 keeps the native inference APK substantially smaller.
+            abiFilters += "arm64-v8a"
+        }
     }
 
     // Keep the business pages in their canonical repository location. Gradle
@@ -54,4 +60,8 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
+}
+
+dependencies {
+    implementation("com.google.ai.edge.litertlm:litertlm-android:0.14.0")
 }

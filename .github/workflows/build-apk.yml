@@ -50,6 +50,31 @@ jobs:
         working-directory: android
         run: gradle :app:assembleDebug --no-daemon --stacktrace
 
+      - name: Verify model runtime and demo assets in APK
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+
+          apk = Path("android/app/build/outputs/apk/debug/app-debug.apk")
+          required = {
+              "lib/arm64-v8a/liblitertlm_jni.so",
+              "assets/always-on-form.html",
+              "assets/trigger-health.html",
+          }
+          with ZipFile(apk) as archive:
+              names = set(archive.namelist())
+          missing = sorted(required - names)
+          if missing:
+              raise SystemExit(f"APK is missing required files: {missing}")
+          unexpected = sorted(name for name in names if name.startswith("lib/x86_64/"))
+          if unexpected:
+              raise SystemExit(f"APK unexpectedly contains x86_64 libraries: {unexpected[:5]}")
+          print(f"Verified {apk} ({apk.stat().st_size:,} bytes)")
+          for name in sorted(required):
+              print(f"  contains {name}")
+          PY
+
       - name: Prepare artifact
         run: |
           mkdir -p artifacts

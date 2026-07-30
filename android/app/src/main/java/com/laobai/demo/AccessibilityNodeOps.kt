@@ -194,6 +194,33 @@ object AccessibilityNodeOps {
                 ?: false
         }
 
+    fun showControlOnScreen(root: AccessibilityNodeInfo, target: SemanticTarget): Boolean =
+        withFlattened(root) { nodes ->
+            val candidates = nodes.filter { it.isEnabled && matchesKind(it, target.kind) }
+            val byId = candidates.firstOrNull { node ->
+                val id = runCatching { node.viewIdResourceName.orEmpty() }.getOrDefault("")
+                matchesHtmlId(id, target.htmlId)
+            }
+            val byHint = candidates.firstOrNull { node ->
+                target.hints.any { hint -> ownText(node).containsNormalized(hint) }
+            }
+            val label = nodes.firstOrNull { node ->
+                normalize(ownText(node)) == normalize(target.label)
+            }
+            (byId ?: byHint ?: label)
+                ?.performAction(AccessibilityNodeInfo.ACTION_SHOW_ON_SCREEN)
+                ?: false
+        }
+
+    fun showTextOnScreen(root: AccessibilityNodeInfo, text: String, exact: Boolean): Boolean =
+        withFlattened(root) { nodes ->
+            val wanted = normalize(text)
+            nodes.firstOrNull { node ->
+                val actual = normalize(ownText(node))
+                if (exact) actual == wanted else actual.contains(wanted)
+            }?.performAction(AccessibilityNodeInfo.ACTION_SHOW_ON_SCREEN) ?: false
+        }
+
     @Suppress("DEPRECATION")
     fun recycle(node: AccessibilityNodeInfo) {
         runCatching { node.recycle() }

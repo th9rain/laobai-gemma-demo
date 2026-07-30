@@ -1,10 +1,13 @@
 package com.laobai.demo
 
 import android.accessibilityservice.AccessibilityService
+import android.accessibilityservice.AccessibilityService.ScreenshotResult
+import android.accessibilityservice.AccessibilityService.TakeScreenshotCallback
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.PixelFormat
 import android.graphics.drawable.GradientDrawable
@@ -14,15 +17,18 @@ import android.os.Looper
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
+import android.view.Display
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
+import java.util.concurrent.Executors
 import kotlin.math.abs
 
 class LaoBaiAccessibilityService : AccessibilityService() {
     private val mainHandler = Handler(Looper.getMainLooper())
+    private val screenshotExecutor = Executors.newSingleThreadExecutor()
     private lateinit var windowManager: WindowManager
     private lateinit var workflowEngine: WorkflowEngine
 
@@ -116,7 +122,112 @@ class LaoBaiAccessibilityService : AccessibilityService() {
         removeControlPanel(showChipAfter = false)
         removeStatusChip()
         removeBubble()
+        screenshotExecutor.shutdownNow()
         super.onDestroy()
+    }
+
+    fun captureScreenForVqa(
+        sessionId: String,
+        stage: String,
+        windowId: Int?,
+        callback: (Result<java.io.File>) -> Unit,
+    ) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            callback(Result.failure(IllegalStateException("端侧 VQA 截图需要 Android 11 或更高版本")))
+            return
+        }
+
+        val overlays = if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            listOfNotNull(bubble, statusChip, controlPanel).map { it to it.visibility }
+        } else {
+            emptyList()
+        }
+        overlays.forEach { (view, _) -> view.visibility = View.INVISIBLE }
+        fun restoreOverlays() {
+            overlays.forEach { (view, visibility) -> view.visibility = visibility }
+        }
+        mainHandler.postDelayed(
+            {
+                val destination = runCatching {
+                    ModelTraceStore.newScreenshotFile(this, sessionId, stage)
+                }.getOrElse { error ->
+                    restoreOverlays()
+                    callback(Result.failure(error))
+                    return@postDelayed
+                }
+                val screenshotCallback = object : TakeScreenshotCallback {
+                    override fun onSuccess(screenshot: ScreenshotResult) {
+                        screenshotExecutor.execute {
+                            val result = saveScreenshot(screenshot, destination)
+                            mainHandler.post {
+                                restoreOverlays()
+                                callback(result)
+                            }
+                        }
+                    }
+
+                    override fun onFailure(errorCode: Int) {
+                        restoreOverlays()
+                        callback(Result.failure(IllegalStateException("系统截图失败，错误码 $errorCode")))
+                    }
+                }
+                runCatching {
+                    if (
+                        Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE &&
+                        windowId != null
+                    ) {
+                        takeScreenshotOfWindow(windowId, mainExecutor, screenshotCallback)
+                    } else {
+                        takeScreenshot(Display.DEFAULT_DISPLAY, mainExecutor, screenshotCallback)
+                    }
+                }.onFailure { error ->
+                    restoreOverlays()
+                    callback(Result.failure(error))
+                }
+            },
+            SCREENSHOT_OVERLAY_SETTLE_MS,
+        )
+    }
+
+    private fun saveScreenshot(
+        screenshot: ScreenshotResult,
+        destination: java.io.File,
+    ): Result<java.io.File> = runCatching {
+        val buffer = screenshot.hardwareBuffer
+        try {
+            val hardwareBitmap = Bitmap.wrapHardwareBuffer(buffer, screenshot.colorSpace)
+                ?: throw IllegalStateException("系统截图无法转换为位图")
+            try {
+                val softwareBitmap = hardwareBitmap.copy(Bitmap.Config.ARGB_8888, false)
+                    ?: throw IllegalStateException("系统截图无法复制到本地")
+                val longestSide = maxOf(softwareBitmap.width, softwareBitmap.height)
+                val savedBitmap = if (longestSide > MAX_VQA_SCREENSHOT_EDGE) {
+                    val scale = MAX_VQA_SCREENSHOT_EDGE.toFloat() / longestSide
+                    Bitmap.createScaledBitmap(
+                        softwareBitmap,
+                        (softwareBitmap.width * scale).toInt().coerceAtLeast(1),
+                        (softwareBitmap.height * scale).toInt().coerceAtLeast(1),
+                        true,
+                    ).also { softwareBitmap.recycle() }
+                } else {
+                    softwareBitmap
+                }
+                try {
+                    destination.outputStream().buffered().use { output ->
+                        if (!savedBitmap.compress(Bitmap.CompressFormat.PNG, 100, output)) {
+                            throw IllegalStateException("无法保存端侧 VQA 截图")
+                        }
+                    }
+                } finally {
+                    savedBitmap.recycle()
+                }
+            } finally {
+                hardwareBitmap.recycle()
+            }
+        } finally {
+            buffer.close()
+        }
+        destination
     }
 
     private fun showBubble() {
@@ -285,6 +396,9 @@ class LaoBaiAccessibilityService : AccessibilityService() {
             }
 
             WorkflowPhase.HUMAN_CONFIRMATION -> {
+                actions.addView(actionButton("模型记录", primary = false) {
+                    launchModelTraces()
+                })
                 actions.addView(actionButton("知道了", primary = true) {
                     removeControlPanel(showChipAfter = false)
                     workflowEngine.acknowledgeHumanConfirmation()
@@ -306,7 +420,22 @@ class LaoBaiAccessibilityService : AccessibilityService() {
             }
 
             WorkflowPhase.ERROR,
-            WorkflowPhase.CANCELLED,
+            WorkflowPhase.CANCELLED -> {
+                if (ModelTraceStore.hasEntries(this)) {
+                    actions.addView(actionButton("模型记录", primary = false) {
+                        launchModelTraces()
+                    })
+                }
+                actions.addView(actionButton("关闭", primary = false) {
+                    removeControlPanel(showChipAfter = false)
+                })
+                if (demoCase != null) {
+                    actions.addView(actionButton("重新开始", primary = true) {
+                        startWorkflowAfterOverlay(demoCase)
+                    })
+                }
+            }
+
             WorkflowPhase.IDLE -> {
                 actions.addView(actionButton("语音", primary = false) {
                     launchVoiceCapture()
@@ -450,8 +579,8 @@ class LaoBaiAccessibilityService : AccessibilityService() {
         }
         if (update.phase == WorkflowPhase.AWAITING_CONFIRMATION) {
             return when (demoCase) {
-                DemoCase.ALWAYS_ON -> "确认后将使用离线回放填写报名信息，并停在“提交报名”之前。"
-                DemoCase.TRIGGER -> "确认后将使用离线回放选择医院、科室、医生和号源，并停在“确认挂号”之前。"
+                DemoCase.ALWAYS_ON -> "确认后将用真实端侧 Gemma VQA 理解页面，由安全执行器填表，并停在“提交报名”之前。"
+                DemoCase.TRIGGER -> "确认后先回放云端规划，再用真实端侧 Gemma VQA 理解页面，并停在“确认挂号”之前。"
                 null -> update.message
             }
         }
@@ -496,6 +625,13 @@ class LaoBaiAccessibilityService : AccessibilityService() {
             Intent(this, VoiceCaptureActivity::class.java).addFlags(
                 Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_MULTIPLE_TASK,
             ),
+        )
+    }
+
+    private fun launchModelTraces() {
+        removeControlPanel(showChipAfter = false)
+        startActivity(
+            ModelTraceActivity.createIntent(this).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
         )
     }
 
@@ -617,6 +753,8 @@ class LaoBaiAccessibilityService : AccessibilityService() {
         private const val VOICE_RETURN_RETRIES = 4
         private const val CASE_LAUNCH_SETTLE_MS = 650L
         private const val CASE_LAUNCH_RETRIES = 8
+        private const val SCREENSHOT_OVERLAY_SETTLE_MS = 140L
+        private const val MAX_VQA_SCREENSHOT_EDGE = 1_280
         private val COLOR_IDLE = Color.rgb(180, 35, 42)
         private val COLOR_AWAITING = Color.rgb(217, 119, 6)
         private val COLOR_RUNNING = Color.rgb(8, 116, 67)

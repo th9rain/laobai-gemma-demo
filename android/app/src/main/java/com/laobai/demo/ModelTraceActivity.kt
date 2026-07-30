@@ -44,15 +44,34 @@ class ModelTraceActivity : Activity() {
 
     private fun renderSession() {
         traceList.removeAllViews()
-        val session = ModelTraceStore.latestSession(this)
-        val entries = session?.entries.orEmpty()
-        emptyView.visibility = if (entries.isEmpty()) View.VISIBLE else View.GONE
-        findViewById<TextView>(R.id.traceSubtitle).text = if (session == null) {
+        val sessions = ModelTraceStore.recentSessions(this)
+            .filter { it.entries.isNotEmpty() }
+            .asReversed()
+        val entryCount = sessions.sumOf { it.entries.size }
+        emptyView.visibility = if (entryCount == 0) View.VISIBLE else View.GONE
+        findViewById<TextView>(R.id.traceSubtitle).text = if (entryCount == 0) {
             "运行一次工作流后，可在这里逐条查看模型输入和原始输出。"
         } else {
-            "${session.demoCase.displayName} · ${formatTime(session.startedAtMs)} · ${entries.size} 次调用"
+            "最近 ${sessions.size} 次流程 · 共 $entryCount 次模型调用 · 记录仅保存在本机"
         }
-        entries.forEachIndexed { index, entry -> traceList.addView(traceCard(index, entry)) }
+        sessions.forEach { session ->
+            traceList.addView(sessionHeader(session))
+            session.entries.forEachIndexed { index, entry ->
+                traceList.addView(traceCard(index, entry))
+            }
+        }
+    }
+
+    private fun sessionHeader(session: ModelTraceSession): View = TextView(this).apply {
+        text = "${session.demoCase.displayName} · ${formatTime(session.startedAtMs)} · ${session.entries.size} 次调用"
+        textSize = 14f
+        setTextColor(getColor(R.color.brand_red))
+        setTypeface(typeface, Typeface.BOLD)
+        setPadding(dp(2), dp(8), dp(2), dp(9))
+        layoutParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+        )
     }
 
     private fun traceCard(index: Int, entry: ModelTraceEntry): View {

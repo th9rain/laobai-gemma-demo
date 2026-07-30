@@ -228,6 +228,8 @@ class LaoBaiAccessibilityService : AccessibilityService() {
             buffer.close()
         }
         destination
+    }.onFailure {
+        runCatching { destination.delete() }
     }
 
     private fun showBubble() {
@@ -535,18 +537,19 @@ class LaoBaiAccessibilityService : AccessibilityService() {
 
         val view = TextView(this).apply {
             text = label
+            contentDescription = "点击查看老白状态和模型记录"
             textSize = 12f
             setTextColor(Color.WHITE)
             setPadding(dp(12), dp(9), dp(12), dp(9))
             elevation = dp(8).toFloat()
             background = roundBackground(statusColor(update.phase), radiusDp = 12)
+            setOnClickListener { showControlPanel() }
         }
         val params = WindowManager.LayoutParams(
             dp(280),
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
                 WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
             PixelFormat.TRANSLUCENT,
         ).apply {

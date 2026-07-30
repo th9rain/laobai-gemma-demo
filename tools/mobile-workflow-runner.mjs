@@ -95,7 +95,7 @@ async function runTrigger() {
   const replay = {
     source: "historical-cloud-plan-replay",
     model: "Gemma 32B dense (recorded fixture; no live call)",
-    appointment: { hospital: "北京协和医院", department: "消化内科", doctor: "李明 主任医师", date: "后天", time: "上午 10:00", patient: "李桂兰" },
+    appointment: { hospital: "北京协和医院", department: "消化内科门诊", doctor: "李明 主任医师", date: "后天", time: "上午 10:00", patient: "李桂兰" },
     stopBefore: ["确认挂号", "支付", "验证码"],
   };
   await fs.writeFile(path.join(dir, "planner-replay.json"), JSON.stringify(replay, null, 2), "utf8");
@@ -119,6 +119,8 @@ async function runTrigger() {
   const state = await page.evaluate(() => ({
     page: document.querySelector(".page.active")?.id,
     patient: document.querySelector("#patient-card strong")?.textContent?.trim(),
+    afterTomorrow: document.querySelector("#dateAfterTomorrow")?.textContent?.trim(),
+    appointmentDate: document.querySelector("#appointmentDate")?.textContent?.trim(),
     confirmText: document.querySelector("#confirm-booking")?.textContent?.trim(),
     successVisible: document.querySelector("#successModal")?.classList.contains("show"),
   }));
@@ -126,7 +128,7 @@ async function runTrigger() {
   await page.close();
   return {
     scenario: "trigger",
-    ok: state.page === "orderPage" && state.patient === "李桂兰" && state.confirmText === "确认挂号" && !state.successVisible,
+    ok: state.page === "orderPage" && state.patient === "李桂兰" && state.afterTomorrow && state.appointmentDate?.startsWith(state.afterTomorrow) && state.confirmText === "确认挂号" && !state.successVisible,
     planner: replay.source,
     stoppedBefore: "确认挂号",
     state,

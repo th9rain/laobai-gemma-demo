@@ -7,7 +7,7 @@ import java.io.File
 import java.util.UUID
 
 enum class ModelTraceSource(val displayName: String) {
-    CLOUD_PLANNER_REPLAY("云侧 Planner · 历史回放"),
+    CLOUD_PLANNER_REPLAY("云侧 QA（Planner）· 历史回放"),
     EDGE_VQA("端侧 Gemma · 真实 VQA"),
 }
 
@@ -33,54 +33,74 @@ data class ModelTraceSession(
 )
 
 /**
- * Persists the latest workflow's model calls in app-private storage. Prompts and
+ * Persists recent workflows' model calls in app-private storage. Prompts and
  * raw outputs are intentionally kept local; screenshot paths never leave the
- * device. Starting a new workflow replaces the previous session and its images.
+ * device. A short history lets a presenter compare Always On and Trigger after
+ * running both cases without retaining an unbounded number of screenshots.
  */
 object ModelTraceStore {
     private const val TRACE_DIRECTORY = "model_traces"
     private const val TRACE_FILE = "latest.json"
     private const val IMAGE_DIRECTORY = "images"
     private const val MAX_ENTRIES = 96
+    private const val MAX_SESSIONS = 4
     private val lock = Any()
 
     fun startSession(context: Context, demoCase: DemoCase): String = synchronized(lock) {
         val directory = traceDirectory(context)
         val imageDirectory = File(directory, IMAGE_DIRECTORY)
-        imageDirectory.listFiles()?.forEach { file -> runCatching { file.delete() } }
         if (!imageDirectory.exists() && !imageDirectory.mkdirs()) {
             throw IllegalStateException("无法创建模型调用截图目录")
         }
 
         val sessionId = UUID.randomUUID().toString()
-        writeSession(
-            context,
-            ModelTraceSession(
+        val sessions = (
+            readSessions(context) + ModelTraceSession(
                 id = sessionId,
                 demoCase = demoCase,
                 startedAtMs = System.currentTimeMillis(),
                 entries = emptyList(),
-            ),
+            )
+        ).takeLast(MAX_SESSIONS)
+        writeSessions(
+            context,
+            sessions,
         )
+        cleanupOrphanedImages(context, sessions)
         sessionId
     }
 
     fun append(context: Context, sessionId: String, entry: ModelTraceEntry) {
         synchronized(lock) {
-            val session = readSession(context) ?: return
-            if (session.id != sessionId) return
-            writeSession(
+            val sessions = readSessions(context)
+            val sessionIndex = sessions.indexOfFirst { it.id == sessionId }
+            if (sessionIndex < 0) return
+            val updated = sessions.toMutableList().apply {
+                val session = get(sessionIndex)
+                set(
+                    sessionIndex,
+                    session.copy(entries = (session.entries + entry).takeLast(MAX_ENTRIES)),
+                )
+            }
+            writeSessions(
                 context,
-                session.copy(entries = (session.entries + entry).takeLast(MAX_ENTRIES)),
+                updated,
             )
+            cleanupOrphanedImages(context, updated)
         }
     }
 
     fun latestSession(context: Context): ModelTraceSession? = synchronized(lock) {
-        readSession(context)
+        readSessions(context).lastOrNull()
     }
 
-    fun hasEntries(context: Context): Boolean = latestSession(context)?.entries?.isNotEmpty() == true
+    fun recentSessions(context: Context): List<ModelTraceSession> = synchronized(lock) {
+        readSessions(context)
+    }
+
+    fun hasEntries(context: Context): Boolean = synchronized(lock) {
+        readSessions(context).any { it.entries.isNotEmpty() }
+    }
 
     fun newScreenshotFile(context: Context, sessionId: String, stage: String): File {
         val safeStage = stage.replace(Regex("[^A-Za-z0-9_-]+"), "-").take(48)
@@ -100,20 +120,50 @@ object ModelTraceStore {
 
     private fun traceFile(context: Context): File = File(traceDirectory(context), TRACE_FILE)
 
-    private fun writeSession(context: Context, session: ModelTraceSession) {
+    private fun writeSessions(context: Context, sessions: List<ModelTraceSession>) {
         val destination = traceFile(context)
         val temporary = File(destination.parentFile, "$TRACE_FILE.tmp")
-        temporary.writeText(session.toJson().toString(), Charsets.UTF_8)
+        val archive = JSONObject().apply {
+            put("schemaVersion", 2)
+            put("sessions", JSONArray().apply { sessions.forEach { put(it.toJson()) } })
+        }
+        temporary.writeText(archive.toString(), Charsets.UTF_8)
         if (!temporary.renameTo(destination)) {
             destination.writeText(temporary.readText(Charsets.UTF_8), Charsets.UTF_8)
             temporary.delete()
         }
     }
 
-    private fun readSession(context: Context): ModelTraceSession? {
+    private fun readSessions(context: Context): List<ModelTraceSession> {
         val file = traceFile(context)
-        if (!file.isFile) return null
-        return runCatching { JSONObject(file.readText(Charsets.UTF_8)).toSession() }.getOrNull()
+        if (!file.isFile) return emptyList()
+        return runCatching {
+            val root = JSONObject(file.readText(Charsets.UTF_8))
+            if (!root.has("sessions")) {
+                listOf(root.toSession())
+            } else {
+                val sessionsJson = root.getJSONArray("sessions")
+                buildList {
+                    for (index in 0 until sessionsJson.length()) {
+                        sessionsJson.optJSONObject(index)?.let { add(it.toSession()) }
+                    }
+                }.takeLast(MAX_SESSIONS)
+            }
+        }.getOrDefault(emptyList())
+    }
+
+    private fun cleanupOrphanedImages(
+        context: Context,
+        sessions: List<ModelTraceSession>,
+    ) {
+        val retained = sessions
+            .flatMap(ModelTraceSession::entries)
+            .mapNotNull(ModelTraceEntry::screenshotPath)
+            .mapTo(mutableSetOf()) { File(it).absolutePath }
+        val imageDirectory = File(traceDirectory(context), IMAGE_DIRECTORY)
+        imageDirectory.listFiles()?.forEach { file ->
+            if (file.absolutePath !in retained) runCatching { file.delete() }
+        }
     }
 
     private fun ModelTraceSession.toJson(): JSONObject = JSONObject().apply {

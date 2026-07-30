@@ -62,7 +62,7 @@ tools/run-always-on-workflow.ps1
 
 - `Gemma 4B Computer-Use`：端侧屏幕理解、控件定位、动作执行。
 - `Gemma 4B/E4B LiteRT Computer-Use`：本地读取 `models/gemma-4-E4B-it.litertlm`。Always-on 必须由这个本地权重生成 GUI action；Trigger 可继续使用云端 Planner 后再交给本地 Gemma / 执行器转换。
-- `Gemma 4 30B Cloud Planner`：只用于 Trigger 看病挂号这类复杂规划，生成候选计划。
+- `Gemma 32B Dense Cloud Planner`：只用于 Trigger 看病挂号这类复杂规划，生成候选计划；APK 演示使用脱敏历史回放，不实时联网。
 
 实际 endpoint、model、key 存在本地 `config.local.json` 或环境变量里。公开仓库不提交真实 Key，也不暴露底层服务。
 如果配置 `localGemmaEnabled=true`，server 会优先调用本地 Gemma LiteRT 模型。
@@ -137,12 +137,11 @@ Trigger 分支才会先调用云端 planner，再调用本地 Gemma 生成/校�
 
 动作：
 
-- 点击开始问询
-- 点击演示回答
+- 打开预约挂号
 - 选择北京协和医院
-- 选择消化内科
-- 选择明天上午
-- 填写准备材料
+- 选择消化内科门诊
+- 选择李明主任医师
+- 选择后天上午 10:00 号源
 - `guard` 停在确认挂号 / 支付 / 验证码
 
 ## 安全策略

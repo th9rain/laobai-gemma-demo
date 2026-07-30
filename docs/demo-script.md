@@ -63,10 +63,10 @@ Always-on 不请求云端 Planner，也不使用静态 fallback。两页表单�
 5. Agent 自动点击演示回答。
 6. Agent 选择：
    - 北京协和医院
-   - 消化内科
-   - 明天上午
-7. Agent 填写准备材料。
-8. Agent 停在 `确认挂号 / 支付 / 验证码` 前。
+   - 消化内科门诊
+   - 李明 主任医师
+   - 后天上午 10:00
+7. Agent 停在 `确认挂号 / 支付 / 验证码` 前。
 
 讲解重点：Trigger 模式由用户主动触发；planner 只拿脱敏摘要做规划，端侧负责执行和安全守卫。
 
@@ -78,5 +78,5 @@ Always-on 不请求云端 Planner，也不使用静态 fallback。两页表单�
 ```
 
 ```text
-界面上看不到 Key、真实 endpoint 或底层服务。Always-on 展示真实本地 Gemma 权重生成 GUI action；Trigger 展示 Gemma 4B Computer-Use 和 Gemma 4 30B Cloud Planner 的协作。
+界面上看不到 Key、真实 endpoint 或底层服务。Always-on 展示真实本地 Gemma 权重生成 GUI action；Trigger 展示 Gemma 4B Computer-Use 和 Gemma 32B Dense Cloud Planner 历史回放的协作。
 ```

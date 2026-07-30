@@ -39,6 +39,7 @@ class WorkflowEngine(
     private var lastScrollFingerprint: Int? = null
     private var scrollIssued = false
     private var traceSessionId: String? = null
+    private var currentTriggerPlan: TriggerReplayPlan? = null
     private val completedVqaStages = mutableSetOf<String>()
     private val vqaAttempts = mutableMapOf<String, Int>()
     private var pendingModelScrollStage: String? = null
@@ -87,6 +88,7 @@ class WorkflowEngine(
             steps = emptyList()
             stepIndex = 0
             targetScope = null
+            currentTriggerPlan = null
             GemmaRuntime.closeSession()
             emit(WorkflowPhase.IDLE, "待命")
         }
@@ -105,6 +107,7 @@ class WorkflowEngine(
         pendingOptionRetries = 0
         pendingVerification = null
         verificationRetries = 0
+        currentTriggerPlan = null
         val root = findCaseRoot(demoCase)
         if (root == null) {
             activeCase = demoCase
@@ -131,10 +134,20 @@ class WorkflowEngine(
             targetScope = null
             return emit(WorkflowPhase.ERROR, "无法创建模型调用记录：${error.message}")
         }
-        if (demoCase == DemoCase.TRIGGER) {
-            TriggerPlannerReplay.record(service, traceSessionId.orEmpty())
+        val triggerPlan = if (demoCase == DemoCase.TRIGGER) {
+            runCatching {
+                TriggerPlannerReplay.record(service, traceSessionId.orEmpty())
+            }.getOrElse { error ->
+                AccessibilityNodeOps.recycle(root)
+                targetScope = null
+                fail("云侧规划回放校验失败：${error.message}")
+                return
+            }
+        } else {
+            null
         }
-        steps = replayFor(demoCase)
+        currentTriggerPlan = triggerPlan
+        steps = if (triggerPlan == null) ALWAYS_STEPS else triggerSteps(triggerPlan)
         val packageName = root.packageName?.toString().orEmpty()
         if (packageName.isBlank()) {
             AccessibilityNodeOps.recycle(root)
@@ -170,6 +183,7 @@ class WorkflowEngine(
         pendingVerification = null
         pendingModelScrollStage = null
         targetScope = null
+        currentTriggerPlan = null
         if (phase == WorkflowPhase.RUNNING || phase == WorkflowPhase.AWAITING_CONFIRMATION) {
             emit(WorkflowPhase.CANCELLED, reason, stepIndex, steps.size)
         }
@@ -186,6 +200,7 @@ class WorkflowEngine(
         pendingVerification = null
         pendingModelScrollStage = null
         targetScope = null
+        currentTriggerPlan = null
         phase = WorkflowPhase.IDLE
         GemmaRuntime.closeSession()
     }
@@ -290,8 +305,7 @@ class WorkflowEngine(
             }
 
             StepResult.NOT_FOUND -> {
-                vqaStage?.let(completedVqaStages::remove)
-                findByScrolling(root, step)
+                fail("端侧 VQA 判断目标可见，但语义执行器找不到“${step.progressLabel}”；已安全停止")
             }
             is StepResult.FAILED -> fail(result.reason)
         }
@@ -324,7 +338,12 @@ class WorkflowEngine(
             stage = stage,
             windowId = scope.windowId,
         ) { screenshotResult ->
-            if (!isCurrentVqa(generation, expectedStepIndex, scope.windowId)) return@captureScreenForVqa
+            if (!isCurrentVqa(generation, expectedStepIndex, scope.windowId)) {
+                screenshotResult.getOrNull()?.let { staleScreenshot ->
+                    runCatching { staleScreenshot.delete() }
+                }
+                return@captureScreenForVqa
+            }
             screenshotResult.onFailure { error ->
                 appendVqaTrace(
                     sessionId = sessionId,
@@ -343,6 +362,7 @@ class WorkflowEngine(
                 val inferenceStarted = SystemClock.elapsedRealtime()
                 GemmaRuntime.runVisionOnce(service, screenshot, prompt) { inferenceResult ->
                     if (!isCurrentVqa(generation, expectedStepIndex, scope.windowId)) {
+                        runCatching { screenshot.delete() }
                         return@runVisionOnce
                     }
                     inferenceResult.onSuccess { inference ->
@@ -351,11 +371,15 @@ class WorkflowEngine(
                         val traceStatus = when {
                             assessment == null -> validation.status
                             assessment.action == "guard" -> "VQA 要求 guard，未授权执行"
-                            !assessment.targetVisible || assessment.action == "scroll" ->
-                                "VQA 未看到目标，授权一次受限滚动后重试"
-                            assessment.action == "wait" -> "VQA 建议等待后重试"
                             !step.matchesVqaTarget(assessment.target) ->
                                 "VQA 目标与当前安全步骤不匹配，未授权执行"
+                            assessment.action == "wait" -> "VQA 建议等待后重试"
+                            assessment.action == "scroll" && !assessment.targetVisible ->
+                                "VQA 明确授权一次受限滚动后重试"
+                            assessment.action == "scroll" ->
+                                "VQA 同时报告目标可见并建议滚动，输出不一致"
+                            !assessment.targetVisible ->
+                                "VQA 报告目标不可见，但没有授权滚动"
                             !step.acceptsVqaAction(assessment.action) ->
                                 "VQA 动作类型与当前安全步骤不匹配，未授权执行"
                             else -> "真实 VQA 已授权当前低风险步骤；由语义执行器复核"
@@ -378,17 +402,8 @@ class WorkflowEngine(
                             assessment.action == "guard" ->
                                 fail("端侧 VQA 要求在“${assessment.target}”前停止")
 
-                            !assessment.targetVisible || assessment.action == "scroll" -> {
-                                completedVqaStages.remove(stage)
-                                pendingModelScrollStage = stage
-                                emit(
-                                    WorkflowPhase.RUNNING,
-                                    "端侧 VQA 未看到目标，滚动一次后重新观察",
-                                    stepIndex + 1,
-                                    steps.size,
-                                )
-                                scheduleAdvance(120)
-                            }
+                            !step.matchesVqaTarget(assessment.target) ->
+                                fail("端侧 VQA 识别目标与当前安全步骤不匹配；请查看模型记录")
 
                             assessment.action == "wait" -> {
                                 completedVqaStages.remove(stage)
@@ -401,8 +416,23 @@ class WorkflowEngine(
                                 scheduleAdvance(650)
                             }
 
-                            !step.matchesVqaTarget(assessment.target) ->
-                                fail("端侧 VQA 识别目标与当前安全步骤不匹配；请查看模型记录")
+                            assessment.action == "scroll" && !assessment.targetVisible -> {
+                                completedVqaStages.remove(stage)
+                                pendingModelScrollStage = stage
+                                emit(
+                                    WorkflowPhase.RUNNING,
+                                    "端侧 VQA 明确要求滚动，受限滚动一次后重新观察",
+                                    stepIndex + 1,
+                                    steps.size,
+                                )
+                                scheduleAdvance(120)
+                            }
+
+                            assessment.action == "scroll" ->
+                                fail("端侧 VQA 同时报告目标可见并建议滚动，输出不一致")
+
+                            !assessment.targetVisible ->
+                                fail("端侧 VQA 报告目标不可见，但没有授权滚动")
 
                             !step.acceptsVqaAction(assessment.action) ->
                                 fail("端侧 VQA 建议动作与安全步骤不匹配；请查看模型记录")
@@ -481,10 +511,10 @@ class WorkflowEngine(
         stage: String,
     ): String {
         val cloudContext = if (demoCase == DemoCase.TRIGGER) {
-            """
-                云端 Planner 历史回放结果（只作为任务上下文，不代表当前联网）：
-                ${TriggerPlannerReplay.output}
-            """.trimIndent()
+            currentTriggerPlan?.let { plan ->
+                "云侧 QA 历史回放已在本机校验并解析：${plan.hospital}；${plan.department}；" +
+                    "${plan.doctor}；${plan.date}${plan.time}。当前未联网。"
+            } ?: "云侧 QA 历史回放状态不可用，当前未联网。"
         } else {
             "本任务完全在端侧执行，不调用云端 Planner。"
         }
@@ -496,7 +526,9 @@ class WorkflowEngine(
             受约束执行器准备进行的下一项低风险操作：${step.vqaContract()}
             $cloudContext
 
-            请判断截图属于哪个页面、目标是否在当前画面可见，并给出建议动作类型。
+            先逐字检查截图当前可视区域中的标题、快捷入口、按钮、字段和卡片，再判断目标是否可见。
+            只要目标文字或对应入口的任何部分已经出现在截图内，targetVisible 必须为 true；不要因为页面还能滚动就选择 scroll。
+            只有目标确实完全不在截图可视区域时，才返回 targetVisible=false 且 recommendedAction=scroll。
             只返回一个严格 JSON 对象，不要 Markdown，不要额外文字：
             {"screen":"中文页面描述","targetVisible":true,"target":"中文目标","recommendedAction":"tap|type_at|select|scroll|wait|guard","reason":"中文理由"}
             不得建议点击“提交报名”“确认挂号”、支付、验证码、授权或删除；遇到这些目标必须 recommendedAction=guard。
@@ -602,7 +634,7 @@ class WorkflowEngine(
     }
 
     private fun vqaStageFor(demoCase: DemoCase, index: Int): String? {
-        val step = replayFor(demoCase).getOrNull(index) ?: return null
+        val step = steps.getOrNull(index) ?: return null
         val prefix = if (demoCase == DemoCase.ALWAYS_ON) "Always On" else "Trigger"
         return "$prefix / 步骤 ${index + 1} · ${step.progressLabel}"
     }
@@ -918,12 +950,12 @@ class WorkflowEngine(
             )
 
             DemoCase.TRIGGER -> listOf(
-                "北京协和医院",
-                "消化内科门诊",
-                "李明",
-                "10:00",
+                currentTriggerPlan?.hospital,
+                currentTriggerPlan?.department,
+                currentTriggerPlan?.doctor,
+                currentTriggerPlan?.timeTarget(),
                 "李桂兰",
-            )
+            ).filterNotNull().ifEmpty { listOf("云侧规划回放") }
         }
         return expected.filterNot { expectedValue -> text.contains(expectedValue) }
     }
@@ -948,6 +980,7 @@ class WorkflowEngine(
         pendingVerification = null
         pendingModelScrollStage = null
         targetScope = null
+        currentTriggerPlan = null
         emit(WorkflowPhase.ERROR, message, stepIndex, steps.size)
         GemmaRuntime.closeSession()
     }
@@ -1145,7 +1178,7 @@ class WorkflowEngine(
             }
 
             DemoCase.TRIGGER -> when {
-                text.contains("确认预约") && text.contains("当前就诊人") -> TRIGGER_STEPS.size
+                text.contains("确认预约") && text.contains("当前就诊人") -> steps.size
                 text.contains("选择号源") -> 4
                 text.contains("选择医生") -> 3
                 text.contains("选择科室") -> 2
@@ -1155,10 +1188,50 @@ class WorkflowEngine(
         }
     }
 
-    private fun replayFor(demoCase: DemoCase): List<ReplayStep> = when (demoCase) {
-        DemoCase.ALWAYS_ON -> ALWAYS_STEPS
-        DemoCase.TRIGGER -> TRIGGER_STEPS
+    private fun triggerSteps(plan: TriggerReplayPlan): List<ReplayStep> {
+        val doctorTarget = plan.doctorTarget()
+        val timeTarget = plan.timeTarget()
+        return listOf(
+            ClickStep(
+                "预约挂号",
+                exact = false,
+                postconditionTokens = listOf("选择医院", plan.hospital),
+            ),
+            ClickStep(
+                plan.hospital,
+                exact = false,
+                postconditionTokens = listOf("选择科室", "已选医院", plan.hospital),
+            ),
+            ClickStep(
+                plan.department,
+                exact = false,
+                postconditionTokens = listOf("选择医生", doctorTarget),
+            ),
+            ClickStep(
+                doctorTarget,
+                exact = false,
+                postconditionTokens = listOf("选择号源", plan.date, timeTarget),
+            ),
+            ClickStep(
+                timeTarget,
+                exact = false,
+                postconditionTokens = listOf(
+                    "确认预约",
+                    "当前就诊人",
+                    plan.hospital,
+                    plan.department,
+                    doctorTarget,
+                    timeTarget,
+                ),
+            ),
+        )
     }
+
+    private fun TriggerReplayPlan.doctorTarget(): String =
+        doctor.substringBefore(' ').trim().ifBlank { doctor }
+
+    private fun TriggerReplayPlan.timeTarget(): String =
+        Regex("\\d{1,2}:\\d{2}").find(time)?.value ?: time
 
     private data class TargetScope(
         val packageName: String,
@@ -1308,34 +1381,6 @@ class WorkflowEngine(
             ),
         )
         private const val ALWAYS_PAGE_TWO_INDEX = 15
-
-        private val TRIGGER_STEPS = listOf(
-            ClickStep(
-                "预约挂号",
-                exact = false,
-                postconditionTokens = listOf("选择医院", "北京协和医院"),
-            ),
-            ClickStep(
-                "北京协和医院",
-                exact = false,
-                postconditionTokens = listOf("选择科室", "已选医院"),
-            ),
-            ClickStep(
-                "消化内科门诊",
-                exact = false,
-                postconditionTokens = listOf("选择医生", "李明"),
-            ),
-            ClickStep(
-                "李明",
-                exact = false,
-                postconditionTokens = listOf("选择号源", "10:00"),
-            ),
-            ClickStep(
-                "10:00",
-                exact = false,
-                postconditionTokens = listOf("确认预约", "当前就诊人"),
-            ),
-        )
 
         private const val MAX_WORKFLOW_DURATION_MS = 8 * 60_000L
         private const val MAX_TRACE_OUTPUT_CHARS = 16_384

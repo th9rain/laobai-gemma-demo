@@ -71,7 +71,7 @@ Copy-Item config.example.json config.local.json
   "localGemmaEnabled": true,
   "localGemmaModelPath": "models/gemma-4-E4B-it.litertlm",
   "localGemmaPython": ".venv/Scripts/python.exe",
-  "publicPlannerLabel": "Gemma 4 30B Cloud Planner",
+  "publicPlannerLabel": "Gemma 32B Dense Cloud Planner",
   "publicEdgeLabel": "Gemma 4B Computer-Use"
 }
 ```

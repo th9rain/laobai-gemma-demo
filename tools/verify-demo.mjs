@@ -25,7 +25,7 @@ async function main() {
       LAOBAI_LOCAL_GEMMA_ENABLED: "1",
       LAOBAI_LOCAL_GEMMA_MODEL_PATH: "models/gemma-4-E4B-it.litertlm",
       LAOBAI_LOCAL_GEMMA_PYTHON: ".venv/Scripts/python.exe",
-      LAOBAI_PUBLIC_PLANNER_LABEL: "Gemma 4 30B Cloud Planner",
+      LAOBAI_PUBLIC_PLANNER_LABEL: "Gemma 32B Dense Cloud Planner",
       LAOBAI_PUBLIC_EDGE_LABEL: "Gemma 4B Computer-Use",
     },
     stdio: ["ignore", stdout, stderr],
@@ -35,7 +35,7 @@ async function main() {
   try {
     await waitForServer();
     const publicConfig = await requestJson("/api/public-config", null, "GET");
-    assert(publicConfig.plannerLabel === "Gemma 4 30B Cloud Planner", "planner label mismatch");
+    assert(publicConfig.plannerLabel === "Gemma 32B Dense Cloud Planner", "planner label mismatch");
     assert(publicConfig.edgeLabel === "Gemma 4B Computer-Use", "edge label mismatch");
 
     const rejectedAlwaysOn = await requestTextExpectError("/api/plan", {

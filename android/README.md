@@ -17,10 +17,12 @@
 - `LaoBaiAccessibilityService`：无障碍服务、可拖动悬浮气泡和确认面板。
 - `WorkflowEngine`：每个低风险步骤执行前先截图并运行端侧 Gemma VQA，
   严格校验模型 JSON、目标和动作类型后，再由语义安全执行器点击或填写。
-- `TriggerPlannerReplay`：挂号 case 回放一次历史云端 Planner 的脱敏输入和
-  原始输出；当前演示不会伪装成实时云调用。
-- `ModelTraceActivity`：流程完成或失败后，逐条查看云侧回放和端侧 VQA 的
-  输入截图、Prompt、原始输出、实际后端、耗时及校验结果。
+- `TriggerPlannerReplay`：挂号 case 回放一次 Gemma 32B Dense 云侧 Planner
+  的脱敏输入和原始输出；输出经过结构与安全边界校验后生成端侧执行目标，
+  当前演示不会伪装成实时云调用。
+- `ModelTraceActivity`：流程完成或失败后，按最近 4 次 workflow 分组查看云
+  侧回放和端侧 VQA 的输入截图、Prompt、原始输出、实际后端、耗时及校验
+  结果；记录只保存在本机应用私有目录。
 - `AccessibilityNodeOps`：按 HTML ID、文字、提示和相对位置查找控件。
 - `VoiceCaptureActivity`：用户点击后进行一次中文语音识别，支持“挂号”与
   “填表”两个口令；API 31+ 优先使用系统端侧识别能力。
@@ -51,8 +53,9 @@ external files，支持断点续传并校验官方 SHA-256。校验完成后不�
 主界面的“运行真实端侧自检”会初始化 LiteRT-LM、执行一次真实生成并展示
 模型原始输出、实际后端和耗时。Always On 的每个步骤都由真实端侧 VQA
 门控；Trigger 先展示历史云端规划回放，再逐步调用真实端侧 VQA。模型返回
-目标不可见或 `scroll` 时只允许一次受限滚动并重新截图；截图、推理或 JSON
-校验失败时安全停止，不会在没有真实 VQA 的情况下伪装成完成。
+目标不可见或返回 `scroll` 时才允许受限滚动并重新截图；每个阶段最多观察
+4 次、最多滚动 3 次，页面不再移动时立即停止。截图、推理、JSON 校验或
+语义目标复核失败时都会安全停止，不会在没有真实 VQA 的情况下伪装完成。
 
 小米 14 Pro 的 12GB/16GB 版本都具备运行 E4B 的基本内存条件；16GB 更稳，
 12GB 建议先清理后台。若 E4B 发生内存不足或后端初始化失败，可在同一 APK
@@ -98,3 +101,6 @@ Android SDK 35，以及 Gradle 8.9 或上述 Wrapper。
 这是用于演示和真机调试的 APK。CI 还会检查 APK 内确实包含 ARM64
 `liblitertlm_jni.so` 与两个 HTML。首次安装后仍需由用户在系统设置中手动
 启用“老白辅助操作”无障碍服务，并在使用语音时授予麦克风权限。
+
+当前 CI 产物使用临时 debug 签名。不同 Actions 构建之间可能无法直接覆盖
+安装；卸载旧包会同时清除 App 私有目录中的已下载模型和模型调用记录。

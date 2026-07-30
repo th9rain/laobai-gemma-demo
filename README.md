@@ -3,7 +3,7 @@
 这个仓库用于验证两个比赛 demo：
 
 - `Always-on 填表`：必须走真实截图 computer-use 链路。本地 Gemma LiteRT 接收手机页面截图和任务，输出坐标动作 JSON，外部 Playwright runner 按坐标点击和输入。
-- `Trigger 看病挂号`：优化版 Trigger 页面。云端 30B Planner 使用历史调用回放 fixture 展示脱敏输入、Prompt、原始输出和解析结果；本地执行阶段使用 Gemma E4B 截图坐标链路打开模拟京医通、选择医院/科室/医生/时间，并在确认挂号、支付、验证码前 guard。
+- `Trigger 看病挂号`：优化版 Trigger 页面。云端 Gemma 32B Dense Planner 使用历史调用回放 fixture 展示脱敏输入、Prompt、原始输出和解析结果；本地执行阶段使用 Gemma E4B 截图坐标链路打开模拟京医通、选择医院/科室/医生/时间，并在确认挂号、支付、验证码前 guard。
 
 ## 当前边界
 

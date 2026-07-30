@@ -83,7 +83,7 @@ async function loadConfig() {
     localGemmaPython: process.env.LAOBAI_LOCAL_GEMMA_PYTHON || ".venv/Scripts/python.exe",
   };
   const publicLabels = {
-    publicPlannerLabel: process.env.LAOBAI_PUBLIC_PLANNER_LABEL || "Gemma 4 30B Cloud Planner",
+    publicPlannerLabel: process.env.LAOBAI_PUBLIC_PLANNER_LABEL || "Gemma 32B Dense Cloud Planner",
     publicEdgeLabel: process.env.LAOBAI_PUBLIC_EDGE_LABEL || "Gemma 4B Computer-Use",
   };
   const localPath = path.join(rootDir, "config.local.json");

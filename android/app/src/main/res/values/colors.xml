@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="brand_red">#B4232A</color>
+    <color name="brand_red_dark">#85191F</color>
+    <color name="page_background">#F5F6F8</color>
+    <color name="panel_border">#E4E7EC</color>
+    <color name="text_primary">#1D2939</color>
+    <color name="text_secondary">#667085</color>
+    <color name="status_enabled">#087443</color>
+    <color name="status_disabled">#B54708</color>
+</resources>

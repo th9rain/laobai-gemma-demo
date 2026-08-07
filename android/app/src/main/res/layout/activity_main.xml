@@ -195,6 +195,16 @@
         </LinearLayout>
 
         <Button
+            android:id="@+id/startVoiceTask"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:layout_marginTop="18dp"
+            android:backgroundTint="@color/brand_red"
+            android:text="@string/start_voice_task"
+            android:textAllCaps="false"
+            android:textColor="@android:color/white" />
+
+        <Button
             android:id="@+id/openModelTraces"
             android:layout_width="match_parent"
             android:layout_height="52dp"
@@ -211,7 +221,8 @@
             android:text="@string/cases_title"
             android:textColor="@color/text_primary"
             android:textSize="18sp"
-            android:textStyle="bold" />
+            android:textStyle="bold"
+            android:visibility="gone" />
 
         <Button
             android:id="@+id/openAlwaysOn"
@@ -221,7 +232,8 @@
             android:backgroundTint="@android:color/white"
             android:text="@string/open_always_on"
             android:textAllCaps="false"
-            android:textColor="@color/text_primary" />
+            android:textColor="@color/text_primary"
+            android:visibility="gone" />
 
         <Button
             android:id="@+id/openTrigger"
@@ -231,7 +243,8 @@
             android:backgroundTint="@android:color/white"
             android:text="@string/open_trigger"
             android:textAllCaps="false"
-            android:textColor="@color/text_primary" />
+            android:textColor="@color/text_primary"
+            android:visibility="gone" />
 
         <TextView
             android:layout_width="match_parent"

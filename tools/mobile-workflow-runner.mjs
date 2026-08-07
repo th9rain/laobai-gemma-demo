@@ -45,14 +45,16 @@ async function runAlwaysOn() {
   await fill(page, log, "#idcard", "110108195303086526");
   await fill(page, log, "#phone", "13812342675");
   await select(page, log, "#education", "高中/中专");
-  await scrollTo(page, log, "#district");
-  await shot(page, dir, "01-after-scroll");
+  await tap(page, log, "#nextBtn", "下一步");
+  await page.waitForTimeout(150);
+  await shot(page, dir, "01-health-address");
   await select(page, log, "#district", "海淀区");
   await fill(page, log, "#address", "中关村街道科育社区18号楼");
   await tap(page, log, "input[name=health][value=良好]");
   await tap(page, log, "input[name=disease][value=无]");
   await fill(page, log, "#diseaseDetail", "无");
-  await scrollTo(page, log, "#emergencyName");
+  await tap(page, log, "#nextBtn", "下一步");
+  await page.waitForTimeout(150);
   await shot(page, dir, "02-emergency-contact");
   await fill(page, log, "#emergencyName", "王敏");
   await select(page, log, "#emergencyRelation", "子女");
@@ -62,7 +64,6 @@ async function runAlwaysOn() {
   await shot(page, dir, "03-course");
   await tap(page, log, "input[name=course][value=智能手机基础班]");
   await tap(page, log, "input[name=timeSlot][value=周三上午]");
-  await scrollTo(page, log, "#nextBtn");
   await tap(page, log, "#nextBtn", "下一步");
   await page.waitForTimeout(250);
   await shot(page, dir, "04-review-guard");
@@ -81,7 +82,7 @@ async function runAlwaysOn() {
   await page.close();
   return {
     scenario: "always-on",
-    ok: state.page === "page3" && state.name === "李桂兰" && state.nextText === "提交报名" && !state.successVisible,
+    ok: state.page === "page5" && state.name === "李桂兰" && state.nextText === "提交报名" && !state.successVisible,
     stoppedBefore: "提交报名",
     state,
   };

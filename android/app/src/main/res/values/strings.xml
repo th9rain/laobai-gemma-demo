@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">老白</string>
-    <string name="main_title">老白演示</string>
-    <string name="main_subtitle">一个 APK 内完成端侧 Gemma、悬浮交互、语音入口与安全工作流。</string>
+    <string name="main_title">老白</string>
+    <string name="main_subtitle">您的智能生活助手。说出需求，老白会理解任务、制定计划并协助完成。</string>
     <string name="permission_title">第一步：开启辅助操作</string>
     <string name="accessibility_enabled">无障碍服务已开启 · 悬浮窗可用</string>
     <string name="accessibility_disabled">无障碍服务未开启</string>
@@ -17,6 +17,7 @@
     <string name="run_model_test">运行真实端侧自检</string>
     <string name="model_output_empty">下载完成后可运行一次真实推理，结果会显示在这里。</string>
     <string name="open_model_traces">查看模型调用记录（输入 / 输出）</string>
+    <string name="start_voice_task">说出一个任务</string>
     <string name="cases_title">本地演示页面</string>
     <string name="open_always_on">打开 Always On 填表</string>
     <string name="open_trigger">打开京医通挂号</string>
@@ -25,25 +26,26 @@
     <string name="accessibility_description">允许老白显示悬浮入口，并在您明确确认或说出口令后辅助点击、滚动和填写已识别的演示页面。</string>
     <string name="bubble_label">白</string>
     <string name="bubble_content_description">打开老白</string>
-    <string name="voice_title">请说“挂号”或“填表”</string>
-    <string name="voice_hint">老白只会在识别到明确指令后启动对应流程。</string>
+    <string name="voice_title">您想让老白做什么？</string>
+    <string name="voice_hint">请用自然语言描述需求，老白会理解任务并制定执行计划。</string>
+    <string name="voice_transcript_placeholder">正在听您说…</string>
     <string name="voice_preparing">正在准备语音识别…</string>
     <string name="voice_requesting_permission">需要麦克风权限才能听取指令…</string>
-    <string name="voice_listening">正在听，请说“挂号”或“填表”…</string>
+    <string name="voice_listening">正在听，请直接说出您的需求…</string>
     <string name="voice_listening_on_device">正在使用端侧语音识别，请开始说话…</string>
     <string name="voice_heard_speech">听到了，请继续…</string>
     <string name="voice_processing">正在识别…</string>
-    <string name="voice_system_prompt">请说“挂号”或“填表”</string>
+    <string name="voice_system_prompt">请直接说出您希望老白完成的任务</string>
     <string name="voice_permission_denied_fallback">未取得麦克风权限，正在尝试系统语音入口…</string>
     <string name="voice_recognizer_fallback">当前识别服务不可用，正在尝试系统语音入口…</string>
     <string name="voice_recognizer_unavailable">手机上没有可用的语音识别服务。</string>
-    <string name="voice_timeout">没有听到明确指令，请点击悬浮球后重试。</string>
-    <string name="voice_no_match">没有识别到指令，请重试。</string>
-    <string name="voice_ambiguous">没有听清是“挂号”还是“填表”，本次未执行。</string>
+    <string name="voice_timeout">没有听到完整需求，请点击悬浮球后重试。</string>
+    <string name="voice_no_match">没有识别到完整需求，请重试。</string>
+    <string name="voice_ambiguous">暂时无法确定要执行的任务，本次未执行。</string>
     <string name="voice_network_error">语音服务网络不可用，本次未执行。</string>
     <string name="voice_recognition_failed">语音识别未完成，本次未执行。</string>
-    <string name="voice_trigger_received">已识别“挂号”，正在交给京医通流程…</string>
-    <string name="voice_always_on_received">已识别“填表”，正在交给 Always On 流程…</string>
+    <string name="voice_trigger_received">任务规划完成，正在准备执行…</string>
+    <string name="voice_always_on_received">任务规划完成，正在准备执行…</string>
     <string name="voice_cancel">取消</string>
     <string name="voice_cancelled">已取消语音识别。</string>
 </resources>

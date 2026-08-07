@@ -7,7 +7,8 @@ import java.io.File
 import java.util.UUID
 
 enum class ModelTraceSource(val displayName: String) {
-    CLOUD_PLANNER_REPLAY("云侧 QA（Planner）· 历史回放"),
+    LOCAL_MEMORY("本地记忆 · 相关信息检索"),
+    CLOUD_PLANNER_REPLAY("云侧 Gemma 32B · 任务规划"),
     EDGE_VQA("端侧 Gemma · 真实 VQA"),
 }
 

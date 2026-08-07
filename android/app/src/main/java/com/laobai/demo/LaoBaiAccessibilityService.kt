@@ -8,8 +8,12 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Paint
 import android.graphics.PixelFormat
+import android.graphics.RectF
+import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.os.Handler
@@ -21,10 +25,18 @@ import android.view.Display
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import android.widget.Button
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import java.util.concurrent.Executors
 import kotlin.math.abs
+
+data class VqaVisualBadge(
+    val code: String,
+    val centerX: Int,
+    val centerY: Int,
+    val showCoordinateHint: Boolean = false,
+)
 
 class LaoBaiAccessibilityService : AccessibilityService() {
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -32,7 +44,7 @@ class LaoBaiAccessibilityService : AccessibilityService() {
     private lateinit var windowManager: WindowManager
     private lateinit var workflowEngine: WorkflowEngine
 
-    private var bubble: TextView? = null
+    private var bubble: ImageView? = null
     private var bubbleParams: WindowManager.LayoutParams? = null
     private var controlPanel: View? = null
     private var panelStatus: TextView? = null
@@ -68,8 +80,8 @@ class LaoBaiAccessibilityService : AccessibilityService() {
 
     private val voiceCommandReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
-            val command = VoiceCommandProtocol.read(intent) ?: return
-            val demoCase = when (command) {
+            val request = VoiceCommandProtocol.read(intent) ?: return
+            val demoCase = when (request.command) {
                 VoiceWorkflowCommand.TRIGGER -> DemoCase.TRIGGER
                 VoiceWorkflowCommand.ALWAYS_ON -> DemoCase.ALWAYS_ON
             }
@@ -77,6 +89,7 @@ class LaoBaiAccessibilityService : AccessibilityService() {
                 {
                     startVoiceWorkflowWhenVisible(
                         demoCase,
+                        userRequest = request.transcript,
                         retriesRemaining = VOICE_RETURN_RETRIES,
                         fallbackOpened = false,
                     )
@@ -130,6 +143,7 @@ class LaoBaiAccessibilityService : AccessibilityService() {
         sessionId: String,
         stage: String,
         windowId: Int?,
+        visualBadges: List<VqaVisualBadge> = emptyList(),
         callback: (Result<java.io.File>) -> Unit,
     ) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
@@ -158,7 +172,7 @@ class LaoBaiAccessibilityService : AccessibilityService() {
                 val screenshotCallback = object : TakeScreenshotCallback {
                     override fun onSuccess(screenshot: ScreenshotResult) {
                         screenshotExecutor.execute {
-                            val result = saveScreenshot(screenshot, destination)
+                            val result = saveScreenshot(screenshot, destination, visualBadges)
                             mainHandler.post {
                                 restoreOverlays()
                                 callback(result)
@@ -192,16 +206,17 @@ class LaoBaiAccessibilityService : AccessibilityService() {
     private fun saveScreenshot(
         screenshot: ScreenshotResult,
         destination: java.io.File,
+        visualBadges: List<VqaVisualBadge>,
     ): Result<java.io.File> = runCatching {
         val buffer = screenshot.hardwareBuffer
         try {
             val hardwareBitmap = Bitmap.wrapHardwareBuffer(buffer, screenshot.colorSpace)
                 ?: throw IllegalStateException("系统截图无法转换为位图")
             try {
-                val softwareBitmap = hardwareBitmap.copy(Bitmap.Config.ARGB_8888, false)
+                val softwareBitmap = hardwareBitmap.copy(Bitmap.Config.ARGB_8888, true)
                     ?: throw IllegalStateException("系统截图无法复制到本地")
                 val longestSide = maxOf(softwareBitmap.width, softwareBitmap.height)
-                val savedBitmap = if (longestSide > MAX_VQA_SCREENSHOT_EDGE) {
+                val scaledBitmap = if (longestSide > MAX_VQA_SCREENSHOT_EDGE) {
                     val scale = MAX_VQA_SCREENSHOT_EDGE.toFloat() / longestSide
                     Bitmap.createScaledBitmap(
                         softwareBitmap,
@@ -212,7 +227,15 @@ class LaoBaiAccessibilityService : AccessibilityService() {
                 } else {
                     softwareBitmap
                 }
+                val savedBitmap = if (scaledBitmap.isMutable) {
+                    scaledBitmap
+                } else {
+                    scaledBitmap.copy(Bitmap.Config.ARGB_8888, true)
+                        ?.also { scaledBitmap.recycle() }
+                        ?: throw IllegalStateException("系统截图无法转换为可标注位图")
+                }
                 try {
+                    drawVisualBadges(savedBitmap, visualBadges)
                     destination.outputStream().buffered().use { output ->
                         if (!savedBitmap.compress(Bitmap.CompressFormat.PNG, 100, output)) {
                             throw IllegalStateException("无法保存端侧 VQA 截图")
@@ -232,6 +255,57 @@ class LaoBaiAccessibilityService : AccessibilityService() {
         runCatching { destination.delete() }
     }
 
+    /**
+     * Draws snapshot-local challenge codes only into the image sent to Gemma.
+     * Nothing is added to the real phone UI. The workflow keeps the code-to-target
+     * mapping private and rejects a batch unless the model reads every code back.
+     */
+    private fun drawVisualBadges(
+        bitmap: Bitmap,
+        badges: List<VqaVisualBadge>,
+    ) {
+        if (badges.isEmpty()) return
+        val canvas = Canvas(bitmap)
+        val badgeHeight = (bitmap.width * 0.058f).coerceIn(26f, 42f)
+        val edge = (badgeHeight * 0.10f).coerceAtLeast(2f)
+        val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.rgb(198, 24, 74)
+            style = Paint.Style.FILL
+        }
+        val outline = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            style = Paint.Style.STROKE
+            strokeWidth = edge
+        }
+        val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            textAlign = Paint.Align.CENTER
+            textSize = badgeHeight * 0.66f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        }
+        val corner = badgeHeight * 0.28f
+        badges.forEach { badge ->
+            val badgeWidth = badgeHeight * if (badge.showCoordinateHint) 5.8f else 1.55f
+            val targetX = bitmap.width * (badge.centerX.coerceIn(0, 1000) / 1000f)
+            val targetY = bitmap.height * (badge.centerY.coerceIn(0, 1000) / 1000f)
+            val left = (targetX - badgeWidth / 2f)
+                .coerceIn(edge, bitmap.width - badgeWidth - edge)
+            val top = (targetY - badgeHeight / 2f)
+                .coerceIn(edge, bitmap.height - badgeHeight - edge)
+            val rect = RectF(left, top, left + badgeWidth, top + badgeHeight)
+            canvas.drawRoundRect(rect, corner, corner, fill)
+            canvas.drawRoundRect(rect, corner, corner, outline)
+            textPaint.textSize = badgeHeight * if (badge.showCoordinateHint) 0.38f else 0.66f
+            val baseline = rect.centerY() - (textPaint.descent() + textPaint.ascent()) / 2f
+            val label = if (badge.showCoordinateHint) {
+                "${badge.code} | X${badge.centerX} | Y${badge.centerY}"
+            } else {
+                badge.code
+            }
+            canvas.drawText(label, rect.centerX(), baseline, textPaint)
+        }
+    }
+
     private fun showBubble() {
         if (bubble != null) return
 
@@ -249,14 +323,14 @@ class LaoBaiAccessibilityService : AccessibilityService() {
             y = dp(180)
         }
 
-        val view = TextView(this).apply {
-            text = "白"
+        val view = ImageView(this).apply {
+            setImageResource(R.drawable.laobai_avatar)
+            scaleType = ImageView.ScaleType.CENTER_CROP
             contentDescription = "打开老白"
-            gravity = Gravity.CENTER
-            textSize = 20f
-            setTextColor(Color.WHITE)
             elevation = dp(8).toFloat()
-            background = roundBackground(COLOR_IDLE, circular = true, strokeColor = 0x33FFFFFF)
+            background = roundBackground(Color.WHITE, circular = true)
+            foreground = roundBackground(Color.TRANSPARENT, circular = true, strokeColor = COLOR_IDLE)
+            clipToOutline = true
             setOnClickListener { toggleControlPanel() }
         }
         attachDragAndClick(view, params)
@@ -268,7 +342,7 @@ class LaoBaiAccessibilityService : AccessibilityService() {
     }
 
     private fun attachDragAndClick(
-        view: TextView,
+        view: View,
         params: WindowManager.LayoutParams,
     ) {
         var downRawX = 0f
@@ -336,13 +410,28 @@ class LaoBaiAccessibilityService : AccessibilityService() {
             background = roundBackground(Color.WHITE, radiusDp = 18, strokeColor = 0x22000000)
         }
 
+        val header = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        header.addView(ImageView(this).apply {
+            setImageResource(R.drawable.laobai_avatar)
+            scaleType = ImageView.ScaleType.CENTER_CROP
+            contentDescription = "老白头像"
+            background = roundBackground(Color.WHITE, circular = true)
+            clipToOutline = true
+        }, LinearLayout.LayoutParams(dp(42), dp(42)).apply {
+            marginEnd = dp(10)
+        })
+
         val title = TextView(this).apply {
             text = panelTitle(update.phase, demoCase)
             textSize = 18f
             setTextColor(COLOR_TEXT)
             setTypeface(typeface, android.graphics.Typeface.BOLD)
         }
-        container.addView(title, matchWrap())
+        header.addView(title, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        container.addView(header, matchWrap())
 
         val message = TextView(this).apply {
             text = panelMessage(update, demoCase)
@@ -390,6 +479,23 @@ class LaoBaiAccessibilityService : AccessibilityService() {
         demoCase: DemoCase?,
     ) {
         when (update.phase) {
+            WorkflowPhase.PLAN_CONFIRMATION -> {
+                actions.addView(actionButton("暂不执行", primary = false) {
+                    removeControlPanel(showChipAfter = false)
+                    workflowEngine.cancel("已取消本次挂号计划")
+                })
+                actions.addView(actionButton("查看依据", primary = false) {
+                    launchModelTraces()
+                })
+                actions.addView(actionButton("确认执行", primary = true) {
+                    removeControlPanel(showChipAfter = false)
+                    mainHandler.postDelayed(
+                        { workflowEngine.confirmTriggerPlan() },
+                        OVERLAY_SETTLE_MS,
+                    )
+                })
+            }
+
             WorkflowPhase.RUNNING -> {
                 actions.addView(actionButton("取消操作", primary = false) {
                     removeControlPanel(showChipAfter = false)
@@ -401,24 +507,29 @@ class LaoBaiAccessibilityService : AccessibilityService() {
                 actions.addView(actionButton("模型记录", primary = false) {
                     launchModelTraces()
                 })
-                actions.addView(actionButton("知道了", primary = true) {
+                actions.addView(actionButton(
+                    if (demoCase == DemoCase.ALWAYS_ON) "我来选择" else "知道了",
+                    primary = true,
+                ) {
                     removeControlPanel(showChipAfter = false)
                     workflowEngine.acknowledgeHumanConfirmation()
                 })
             }
 
             WorkflowPhase.AWAITING_CONFIRMATION -> {
-                actions.addView(actionButton("语音", primary = false) {
-                    launchVoiceCapture()
-                })
                 actions.addView(actionButton("暂不", primary = false) {
                     removeControlPanel(showChipAfter = false)
                     workflowEngine.dismissConfirmation()
                 })
-                actions.addView(actionButton("开始", primary = true) {
-                    val selected = demoCase ?: return@actionButton
-                    startWorkflowAfterOverlay(selected)
-                })
+                if (demoCase == DemoCase.ALWAYS_ON) {
+                    actions.addView(actionButton("帮我填", primary = true) {
+                        startWorkflowAfterOverlay(DemoCase.ALWAYS_ON)
+                    })
+                } else {
+                    actions.addView(actionButton("说出需求", primary = true) {
+                        launchVoiceCapture()
+                    })
+                }
             }
 
             WorkflowPhase.ERROR,
@@ -439,17 +550,12 @@ class LaoBaiAccessibilityService : AccessibilityService() {
             }
 
             WorkflowPhase.IDLE -> {
-                actions.addView(actionButton("语音", primary = false) {
-                    launchVoiceCapture()
-                })
                 actions.addView(actionButton("关闭", primary = false) {
                     removeControlPanel(showChipAfter = false)
                 })
-                if (demoCase != null) {
-                    actions.addView(actionButton("重新开始", primary = true) {
-                        startWorkflowAfterOverlay(demoCase)
-                    })
-                }
+                actions.addView(actionButton("说出需求", primary = true) {
+                    launchVoiceCapture()
+                })
             }
         }
     }
@@ -479,21 +585,18 @@ class LaoBaiAccessibilityService : AccessibilityService() {
 
     private fun renderWorkflowUpdate(update: WorkflowUpdate) {
         bubble?.apply {
-            text = when (update.phase) {
-                WorkflowPhase.IDLE -> "白"
-                WorkflowPhase.AWAITING_CONFIRMATION -> "?"
-                WorkflowPhase.RUNNING -> "…"
-                WorkflowPhase.HUMAN_CONFIRMATION -> "✓"
-                WorkflowPhase.ERROR -> "!"
-                WorkflowPhase.CANCELLED -> "×"
-            }
             contentDescription = when (update.phase) {
+                WorkflowPhase.PLAN_CONFIRMATION -> "挂号计划待确认"
                 WorkflowPhase.RUNNING -> "老白运行中，点击查看或取消"
                 WorkflowPhase.HUMAN_CONFIRMATION -> "需要人工确认"
                 WorkflowPhase.ERROR -> "老白操作出错，点击查看"
                 else -> "打开老白"
             }
-            background = roundBackground(statusColor(update.phase), circular = true, strokeColor = 0x33FFFFFF)
+            foreground = roundBackground(
+                Color.TRANSPARENT,
+                circular = true,
+                strokeColor = statusColor(update.phase),
+            )
         }
 
         if (controlPanel != null && panelPhase != update.phase) {
@@ -504,10 +607,18 @@ class LaoBaiAccessibilityService : AccessibilityService() {
         panelStatus?.text = panelMessage(update, update.demoCase)
         if (controlPanel == null) {
             when (update.phase) {
+                WorkflowPhase.PLAN_CONFIRMATION -> showControlPanel()
                 WorkflowPhase.RUNNING,
-                WorkflowPhase.HUMAN_CONFIRMATION,
                 WorkflowPhase.ERROR,
                 WorkflowPhase.CANCELLED -> showStatusChip(update)
+
+                WorkflowPhase.HUMAN_CONFIRMATION -> {
+                    if (update.demoCase == DemoCase.ALWAYS_ON) {
+                        showControlPanel()
+                    } else {
+                        showStatusChip(update)
+                    }
+                }
 
                 WorkflowPhase.IDLE,
                 WorkflowPhase.AWAITING_CONFIRMATION -> removeStatusChip()
@@ -522,6 +633,7 @@ class LaoBaiAccessibilityService : AccessibilityService() {
             ""
         }
         val label = when (update.phase) {
+            WorkflowPhase.PLAN_CONFIRMATION -> "计划待确认：${update.message}"
             WorkflowPhase.RUNNING -> "运行中$progress：${update.message}"
             WorkflowPhase.HUMAN_CONFIRMATION -> "请人工确认：${update.message}"
             WorkflowPhase.ERROR -> "操作出错：${update.message}"
@@ -563,28 +675,30 @@ class LaoBaiAccessibilityService : AccessibilityService() {
     }
 
     private fun panelTitle(phase: WorkflowPhase, demoCase: DemoCase?): String = when (phase) {
+        WorkflowPhase.PLAN_CONFIRMATION -> "已生成挂号计划"
         WorkflowPhase.RUNNING -> "老白正在操作"
-        WorkflowPhase.HUMAN_CONFIRMATION -> "请您检查并确认"
+        WorkflowPhase.HUMAN_CONFIRMATION -> when (demoCase) {
+            DemoCase.ALWAYS_ON -> "请您选择课程和时间"
+            else -> "请您检查并确认"
+        }
         WorkflowPhase.ERROR -> "操作未完成"
         WorkflowPhase.CANCELLED -> "操作已取消"
         WorkflowPhase.AWAITING_CONFIRMATION -> when (demoCase) {
-            DemoCase.ALWAYS_ON -> "是否帮您填写表单？"
-            DemoCase.TRIGGER -> "是否帮您完成挂号选择？"
-            null -> "老白"
+            DemoCase.ALWAYS_ON -> "发现一个待填写的表单"
+            else -> "您想让老白做什么？"
         }
 
-        WorkflowPhase.IDLE -> if (demoCase == null) "未识别到演示页面" else "老白"
+        WorkflowPhase.IDLE -> "老白随时在这里"
     }
 
     private fun panelMessage(update: WorkflowUpdate, demoCase: DemoCase?): String {
         if (update.phase == WorkflowPhase.IDLE && demoCase == null) {
-            return "请先打开 Always On 报名表或京医通页面，再点击悬浮球。"
+            return "请直接说出您的需求。老白会理解任务、调取相关记忆并制定执行计划。"
         }
         if (update.phase == WorkflowPhase.AWAITING_CONFIRMATION) {
             return when (demoCase) {
-                DemoCase.ALWAYS_ON -> "确认后将用真实端侧 Gemma VQA 理解页面，由安全执行器填表，并停在“提交报名”之前。"
-                DemoCase.TRIGGER -> "确认后先回放云端规划，再用真实端侧 Gemma VQA 理解页面，并停在“确认挂号”之前。"
-                null -> update.message
+                DemoCase.ALWAYS_ON -> "我看到这里可能需要填写个人信息。需要我读取您保存在本地的资料，帮您填一下吗？"
+                else -> "请用自然语言描述任务。规划完成后，老白会自主选择对应能力并执行；关键提交仍由您确认。"
             }
         }
         return update.message
@@ -640,6 +754,7 @@ class LaoBaiAccessibilityService : AccessibilityService() {
 
     private fun startVoiceWorkflowWhenVisible(
         demoCase: DemoCase,
+        userRequest: String,
         retriesRemaining: Int,
         fallbackOpened: Boolean,
     ) {
@@ -647,12 +762,13 @@ class LaoBaiAccessibilityService : AccessibilityService() {
         if (workflowEngine.detectCurrentCase() == demoCase) {
             removeControlPanel(showChipAfter = false)
             if (demoCase == DemoCase.ALWAYS_ON) alwaysOnPromptedForVisit = true
-            workflowEngine.start(demoCase)
+            workflowEngine.start(demoCase, userRequest)
         } else if (retriesRemaining > 0) {
             mainHandler.postDelayed(
                 {
                     startVoiceWorkflowWhenVisible(
                         demoCase,
+                        userRequest,
                         retriesRemaining - 1,
                         fallbackOpened,
                     )
@@ -673,6 +789,7 @@ class LaoBaiAccessibilityService : AccessibilityService() {
                 {
                     startVoiceWorkflowWhenVisible(
                         demoCase,
+                        userRequest,
                         retriesRemaining = CASE_LAUNCH_RETRIES,
                         fallbackOpened = true,
                     )
@@ -680,7 +797,7 @@ class LaoBaiAccessibilityService : AccessibilityService() {
                 CASE_LAUNCH_SETTLE_MS,
             )
         } else {
-            workflowEngine.start(demoCase)
+            workflowEngine.start(demoCase, userRequest)
         }
     }
 
@@ -722,6 +839,7 @@ class LaoBaiAccessibilityService : AccessibilityService() {
     private fun statusColor(phase: WorkflowPhase): Int = when (phase) {
         WorkflowPhase.IDLE -> COLOR_IDLE
         WorkflowPhase.AWAITING_CONFIRMATION -> COLOR_AWAITING
+        WorkflowPhase.PLAN_CONFIRMATION -> COLOR_PLAN
         WorkflowPhase.RUNNING -> COLOR_RUNNING
         WorkflowPhase.HUMAN_CONFIRMATION -> COLOR_HUMAN
         WorkflowPhase.ERROR -> COLOR_ERROR
@@ -760,6 +878,7 @@ class LaoBaiAccessibilityService : AccessibilityService() {
         private const val MAX_VQA_SCREENSHOT_EDGE = 1_280
         private val COLOR_IDLE = Color.rgb(180, 35, 42)
         private val COLOR_AWAITING = Color.rgb(217, 119, 6)
+        private val COLOR_PLAN = Color.rgb(79, 70, 229)
         private val COLOR_RUNNING = Color.rgb(8, 116, 67)
         private val COLOR_HUMAN = Color.rgb(37, 99, 235)
         private val COLOR_ERROR = Color.rgb(180, 35, 42)

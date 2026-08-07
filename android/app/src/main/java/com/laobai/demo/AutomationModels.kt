@@ -8,6 +8,7 @@ enum class DemoCase(val displayName: String) {
 enum class WorkflowPhase {
     IDLE,
     AWAITING_CONFIRMATION,
+    PLAN_CONFIRMATION,
     RUNNING,
     HUMAN_CONFIRMATION,
     ERROR,

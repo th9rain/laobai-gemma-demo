@@ -57,6 +57,9 @@ class MainActivity : Activity() {
         findViewById<Button>(R.id.openAccessibilitySettings).setOnClickListener {
             startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
         }
+        findViewById<Button>(R.id.startVoiceTask).setOnClickListener {
+            startActivity(Intent(this, VoiceCaptureActivity::class.java))
+        }
         findViewById<Button>(R.id.openAlwaysOn).setOnClickListener {
             startActivity(CaseActivity.createIntent(this, CaseActivity.CASE_ALWAYS_ON))
         }
@@ -204,14 +207,13 @@ class MainActivity : Activity() {
 
     private fun isAccessibilityServiceEnabled(): Boolean {
         val expected = ComponentName(this, LaoBaiAccessibilityService::class.java)
-            .flattenToString()
         val enabled = Settings.Secure.getString(
             contentResolver,
             Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES,
         ).orEmpty()
 
         return enabled.split(':').any { component ->
-            component.equals(expected, ignoreCase = true)
+            ComponentName.unflattenFromString(component) == expected
         }
     }
 

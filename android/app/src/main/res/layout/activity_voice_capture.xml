@@ -14,12 +14,22 @@
         android:elevation="12dp"
         android:gravity="center_horizontal"
         android:orientation="vertical"
-        android:padding="24dp">
+        android:padding="22dp">
+
+        <ImageView
+            android:layout_width="58dp"
+            android:layout_height="58dp"
+            android:background="@drawable/avatar_circle_background"
+            android:clipToOutline="true"
+            android:contentDescription="@string/app_name"
+            android:scaleType="centerCrop"
+            android:src="@drawable/laobai_avatar" />
 
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:gravity="center"
+            android:layout_marginTop="10dp"
             android:text="@string/voice_title"
             android:textColor="@color/text_primary"
             android:textSize="20sp"
@@ -35,6 +45,19 @@
             android:indeterminateTint="@color/brand_red" />
 
         <TextView
+            android:id="@+id/voiceTranscript"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:background="@drawable/transcript_background"
+            android:gravity="start|center_vertical"
+            android:minHeight="88dp"
+            android:padding="16dp"
+            android:text="@string/voice_transcript_placeholder"
+            android:textColor="@color/text_secondary"
+            android:textSize="18sp" />
+
+        <TextView
             android:id="@+id/voiceStatus"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -43,6 +66,17 @@
             android:text="@string/voice_preparing"
             android:textColor="@color/text_primary"
             android:textSize="15sp" />
+
+        <TextView
+            android:id="@+id/voicePlanning"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:gravity="start"
+            android:lineSpacingExtra="4dp"
+            android:textColor="@color/text_secondary"
+            android:textSize="13sp"
+            android:visibility="gone" />
 
         <TextView
             android:layout_width="match_parent"
